@@ -1,5 +1,5 @@
-from sqlalchemy import SmallInteger, String, Text
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import ForeignKey, SmallInteger, String, Text
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from typing import Optional
 
 from core.constants import (MAX_NAME_LEN, MAX_USERNAME_LEN,
@@ -36,8 +36,30 @@ class User(NamedModelMixin, Base):
 
     # Education section:
     rating: Mapped[int] = mapped_column(SmallInteger(), default=0)
+    grade: Mapped[Optional[str]] = mapped_column(String())
 
 
 class Category(NamedModelMixin, Base):
     """The db model for category of worlds (like food, buildings etc.)"""
     __tablename__ = 'categories'
+
+    translations: Mapped[list['Translation']] = relationship(
+        back_populates='category'
+    )
+    words: Mapped[list['Word']] = relationship(back_populates='category')
+
+
+class Translation(NamedModelMixin, Base):
+    """The db models for Russian translations of English words."""
+    __tablename__ = 'translations'
+
+    category_id: Mapped[int] = mapped_column(ForeignKey('categories.id'))
+    category: Mapped['Category'] = relationship(back_populates='translations')
+
+
+class Word(NamedModelMixin, Base):
+    """The db model for English words."""
+    __tablename__ = 'words'
+
+    category_id: Mapped[int] = mapped_column(ForeignKey('categories.id'))
+    category: Mapped['Category'] = relationship(back_populates='words')
