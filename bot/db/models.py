@@ -1,16 +1,19 @@
-from sqlalchemy import ForeignKey, SmallInteger, String, Text
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, SmallInteger, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from typing import Optional
 
 from core.constants import (MAX_NAME_LEN, MAX_USERNAME_LEN,
                             MAX_PHONE_NUMBER_LEN, STRANGER)
-from core.models import NamedModelMixin
+from core.models import IdModelMixin, NamedModelMixin
 
 
 class Base(DeclarativeBase):
     """The base SQLAlchemy class."""
     type_annotation_map = {
-        str: Text()
+        str: Text(),
+        datetime: DateTime()
     }
 
 
@@ -37,6 +40,9 @@ class User(NamedModelMixin, Base):
     # Education section:
     rating: Mapped[int] = mapped_column(SmallInteger(), default=0)
     grade: Mapped[Optional[str]] = mapped_column(String())
+    lessons: Mapped[Optional[list['Lesson']]] = relationship(
+        back_populates='student'
+    )
 
 
 class Category(NamedModelMixin, Base):
@@ -63,3 +69,15 @@ class Word(NamedModelMixin, Base):
 
     category_id: Mapped[int] = mapped_column(ForeignKey('categories.id'))
     category: Mapped['Category'] = relationship(back_populates='words')
+
+
+class Lesson(IdModelMixin, Base):
+    """The db model for planned lesson."""
+    __tablename__ = 'lessons'
+
+    student_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
+    student: Mapped['User'] = relationship(back_populates='lessons')
+    # This field will always contain GMT datetime.
+    # User will get both GMT datetime and converted to his timezone datetime
+    # according to his city.
+    lesson_datetime: Mapped[datetime]
