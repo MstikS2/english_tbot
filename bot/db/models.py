@@ -4,6 +4,7 @@ from typing import Optional
 
 from core.constants import (MAX_NAME_LEN, MAX_USERNAME_LEN,
                             MAX_PHONE_NUMBER_LEN, STRANGER)
+from core.models import NamedModelMixin
 
 
 class Base(DeclarativeBase):
@@ -13,15 +14,13 @@ class Base(DeclarativeBase):
     }
 
 
-class User(Base):
+class User(NamedModelMixin, Base):
     """The User db model."""
     __tablename__ = 'users'
 
     # User info section:
-    id: Mapped[int] = mapped_column(primary_key=True)
     age: Mapped[Optional[int]] = mapped_column(SmallInteger())
     city: Mapped[Optional[str]] = mapped_column(String(MAX_NAME_LEN))
-    name: Mapped[Optional[str]] = mapped_column(String(MAX_NAME_LEN))
     phone_number: Mapped[Optional[str]] = mapped_column(
         String(MAX_PHONE_NUMBER_LEN)
     )
@@ -34,3 +33,11 @@ class User(Base):
     favorite_films: Mapped[Optional[str]]
     favorite_games: Mapped[Optional[str]]
     favorite_music: Mapped[Optional[str]]
+
+    # Education section:
+    rating: Mapped[int] = mapped_column(SmallInteger(), default=0)
+
+
+class Category(NamedModelMixin, Base):
+    """The db model for category of worlds (like food, buildings etc.)"""
+    __tablename__ = 'categories'
