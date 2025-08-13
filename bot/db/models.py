@@ -29,6 +29,7 @@ class User(NamedModelMixin, Base):
     )
     role: Mapped[Optional[str]] = mapped_column(default=STRANGER)
     username: Mapped[Optional[str]] = mapped_column(String(MAX_USERNAME_LEN))
+    user_timezone: Mapped[Optional[str]] = mapped_column(String())
 
     # Student interests section:
     interests: Mapped[Optional[str]]
