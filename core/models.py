@@ -7,6 +7,7 @@ from core.constants import MAX_NAME_LEN
 
 class IdModelMixin:
     """The mixin for db models that adds id column."""
+
     id: Mapped[int] = mapped_column(primary_key=True)
 
 

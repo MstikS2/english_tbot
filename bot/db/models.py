@@ -11,6 +11,7 @@ from core.models import IdModelMixin, NamedModelMixin
 
 class Base(DeclarativeBase):
     """The base SQLAlchemy class."""
+
     type_annotation_map = {
         str: Text(),
         datetime: DateTime()
@@ -19,6 +20,7 @@ class Base(DeclarativeBase):
 
 class User(NamedModelMixin, Base):
     """The User db model."""
+
     __tablename__ = 'users'
 
     # User info section:
@@ -48,6 +50,7 @@ class User(NamedModelMixin, Base):
 
 class Category(NamedModelMixin, Base):
     """The db model for category of worlds (like food, buildings etc.)"""
+
     __tablename__ = 'categories'
 
     translations: Mapped[list['Translation']] = relationship(
@@ -58,6 +61,7 @@ class Category(NamedModelMixin, Base):
 
 class Translation(NamedModelMixin, Base):
     """The db models for Russian translations of English words."""
+
     __tablename__ = 'translations'
 
     category_id: Mapped[int] = mapped_column(ForeignKey('categories.id'))
@@ -66,6 +70,7 @@ class Translation(NamedModelMixin, Base):
 
 class Word(NamedModelMixin, Base):
     """The db model for English words."""
+
     __tablename__ = 'words'
 
     category_id: Mapped[int] = mapped_column(ForeignKey('categories.id'))
@@ -74,6 +79,7 @@ class Word(NamedModelMixin, Base):
 
 class Lesson(IdModelMixin, Base):
     """The db model for planned lesson."""
+
     __tablename__ = 'lessons'
 
     student_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
