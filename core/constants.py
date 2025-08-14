@@ -7,3 +7,9 @@ MAX_USERNAME_LEN = 32
 ADMIN, DEV, STRANGER, STUDENT = 'admin', 'dev', 'stranger', 'student'
 STAFF = (ADMIN, DEV)
 USER_ROLES = STAFF + (STRANGER, STUDENT)
+
+# Logging staff:
+LOG_DIR = 'logs'
+LOG_FORMATTER_MSG = ('%(asctime)s| %(levelname)s| %(name)s - %(funcName)s: '
+                     '%(message)s')
+LOG_MAXBYTES = 50000000

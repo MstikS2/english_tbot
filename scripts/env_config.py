@@ -1,9 +1,11 @@
-# import logging
 from os import getenv
 
 from dotenv import load_dotenv
 
-from core.error_messages import MISSING_ENV_VALUE_MSG
+from core.loggers import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class Env:
@@ -12,6 +14,7 @@ class Env:
     def __init__(self):
         self.__load_env()
         self.__check_env()
+        logger.info('.env loaded successfully')
 
     def __check_env(self):
         """Checks if all env values are specified."""
@@ -20,8 +23,8 @@ class Env:
             if not value:
                 empty_values.append(value)
         if empty_values:
-            error_message = MISSING_ENV_VALUE_MSG.format(empty_values)
-            # logging.critical(error_message)
+            error_message = f'Values are not specified: {empty_values}'
+            logger.critical(error_message)
             raise ValueError(error_message)
 
     def __load_env(self):
