@@ -1,9 +1,9 @@
 from sqlalchemy import create_engine
 
-from bot.db.models import Base
+from db.models import Base
 
 
-engine = create_engine('sqlite:///bot/db/Database.db', echo=True)
+engine = create_engine('sqlite:///db/Database.db', echo=True)
 
 
 def create_db():
