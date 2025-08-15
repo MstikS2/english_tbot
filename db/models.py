@@ -1,6 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from sqlalchemy import DateTime, ForeignKey, SmallInteger, String, Text
+from sqlalchemy import (DateTime, ForeignKey, Interval, SmallInteger, String,
+                        Text)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from typing import Optional
 
@@ -45,6 +46,11 @@ class User(NamedModelMixin, Base):
     grade: Mapped[Optional[str]] = mapped_column(String())
     lessons: Mapped[Optional[list['Lesson']]] = relationship(
         back_populates='student'
+    )
+    # No reminder if null:
+    remind_time: Mapped[Optional[timedelta]] = mapped_column(
+        Interval(),
+        default=timedelta(hours=1)
     )
 
 
