@@ -159,11 +159,11 @@ def finish_registration(message, bot, user):
                                 f'в боте: {user.name}')
             if username:
                 confirmation_msg += f' @{username}'
-            # send_text_message(
-            #     bot,
-            #     ADMIN_ID,
-            #     confirmation_msg + f'. Принять ученика: /confirm_{user.id}'
-            # )
+            send_text_message(
+                bot,
+                ADMIN_ID,
+                confirmation_msg + f'. Принять ученика: /confirm_{user.id}'
+            )
         else:
             send_text_message(bot, user.id, 'Вы и есть администратор... '
                                             'Одобрено!')
