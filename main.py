@@ -1,21 +1,22 @@
 from telebot import TeleBot
 
-from bot.handlers import answer_to_invalid_msg
+from bot.handlers import answer_to_invalid_msg, handle_start_message
 from bot.settings import DEBUG
 from core.loggers import get_logger
-from scripts.env_config import Env
+from scripts.env_config import DEBUG_TOKEN, WORKER_TOKEN
 
 
 logger = get_logger(__name__)
 
 
-env = Env()
+bot = TeleBot(token=DEBUG_TOKEN if DEBUG
+              else WORKER_TOKEN)  # type: ignore[arg-type]
 
-bot = TeleBot(token=env.debug_token if DEBUG else env.worker_token)
-
+bot.register_message_handler(handle_start_message, commands=['start'],
+                             pass_bot=True)
 bot.register_message_handler(answer_to_invalid_msg, pass_bot=True)
 
-logger.debug('Handlers have been registered')
+logger.info('Handlers have been registered')
 
 
 def main():

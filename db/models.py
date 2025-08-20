@@ -5,8 +5,8 @@ from sqlalchemy import (DateTime, ForeignKey, Interval, SmallInteger, String,
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from typing import Optional
 
-from core.constants import (MAX_NAME_LEN, MAX_USERNAME_LEN,
-                            MAX_PHONE_NUMBER_LEN, STRANGER)
+from core.constants import (DEFAULT_CITY, DEFAULT_TZ, MAX_NAME_LEN,
+                            MAX_USERNAME_LEN, MAX_PHONE_NUMBER_LEN, STRANGER)
 from core.models import IdModelMixin, NamedModelMixin
 
 
@@ -26,13 +26,15 @@ class User(NamedModelMixin, Base):
 
     # User info section:
     age: Mapped[Optional[int]] = mapped_column(SmallInteger())
-    city: Mapped[Optional[str]] = mapped_column(String(MAX_NAME_LEN))
+    city: Mapped[Optional[str]] = mapped_column(String(MAX_NAME_LEN),
+                                                default=DEFAULT_CITY)
     phone_number: Mapped[Optional[str]] = mapped_column(
         String(MAX_PHONE_NUMBER_LEN)
     )
     role: Mapped[Optional[str]] = mapped_column(default=STRANGER)
     username: Mapped[Optional[str]] = mapped_column(String(MAX_USERNAME_LEN))
-    user_timezone: Mapped[Optional[str]] = mapped_column(String())
+    user_timezone: Mapped[Optional[str]] = mapped_column(String(),
+                                                         default=DEFAULT_TZ)
 
     # Student interests section:
     interests: Mapped[Optional[str]]
@@ -90,7 +92,7 @@ class Lesson(IdModelMixin, Base):
 
     student_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
     student: Mapped['User'] = relationship(back_populates='lessons')
-    # This field will always contain GMT datetime.
+    # This field will always contain UTC datetime.
     # User will get both GMT datetime and converted to his timezone datetime
     # according to his city.
     lesson_datetime: Mapped[datetime]

@@ -1,9 +1,12 @@
 from sqlalchemy import create_engine
 
+from core.loggers import get_logger
 from db.models import Base
 
 
-engine = create_engine('sqlite:///db/Database.db', echo=True)
+logger = get_logger('sqlalchemy')
+
+engine = create_engine('sqlite:///db/Database.db')
 
 
 def create_db():
