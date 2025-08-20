@@ -5,7 +5,7 @@ from sqlalchemy import (DateTime, ForeignKey, Interval, SmallInteger, String,
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from typing import Optional
 
-from core.constants import (DEFAULT_CITY, DEFAULT_TZ, MAX_NAME_LEN,
+from core.constants import (DEFAULT_CITY, DEFAULT_TZ, MAX_CITY_LEN,
                             MAX_USERNAME_LEN, MAX_PHONE_NUMBER_LEN, STRANGER)
 from core.models import IdModelMixin, NamedModelMixin
 
@@ -26,15 +26,15 @@ class User(NamedModelMixin, Base):
 
     # User info section:
     age: Mapped[Optional[int]] = mapped_column(SmallInteger())
-    city: Mapped[Optional[str]] = mapped_column(String(MAX_NAME_LEN),
-                                                default=DEFAULT_CITY)
+    city: Mapped[str] = mapped_column(
+        String(MAX_CITY_LEN), server_default=DEFAULT_CITY
+    )
     phone_number: Mapped[Optional[str]] = mapped_column(
         String(MAX_PHONE_NUMBER_LEN)
     )
     role: Mapped[Optional[str]] = mapped_column(default=STRANGER)
     username: Mapped[Optional[str]] = mapped_column(String(MAX_USERNAME_LEN))
-    user_timezone: Mapped[Optional[str]] = mapped_column(String(),
-                                                         default=DEFAULT_TZ)
+    timezone: Mapped[str] = mapped_column(String(), server_default=DEFAULT_TZ)
 
     # Student interests section:
     interests: Mapped[Optional[str]]

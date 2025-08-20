@@ -1,6 +1,7 @@
 # DB values:
 DEFAULT_CITY = 'Москва, Центральный федеральный фкруг, Россия'
 DEFAULT_TZ = 'Europe/Moscow'
+MAX_CITY_LEN = 256
 MAX_NAME_LEN = 50
 MAX_PHONE_NUMBER_LEN = 19
 MAX_USERNAME_LEN = 32

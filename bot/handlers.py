@@ -2,9 +2,9 @@ from telebot import TeleBot
 from telebot.apihelper import ApiException
 from telebot.types import Message
 
-from bot.permissions import check_debug_permission, check_staff_id
+from bot.permissions import has_debug_permission, is_staff_id
 from core.exceptions import ToUserError
-from core.constants import ADMIN, DEV, PENDING, STRANGER
+from core.constants import ADMIN, DEV, PENDING, STRANGER, STUDENT
 from core.loggers import get_logger
 from db.crud import create_obj, get_by_id, update_obj
 from db.models import User
@@ -34,7 +34,7 @@ def handle_start_message(message: Message, bot: TeleBot):
     """
     chat = message.chat
     user_id = chat.id
-    if not check_debug_permission(user_id):
+    if not has_debug_permission(user_id):
         return send_text_message(bot, user_id, 'You are not allowed to '
                                                'testing. Go away!')
     user = get_by_id(User, user_id)
@@ -126,7 +126,7 @@ def confirm_city(message: Message, bot: TeleBot, geocoded_city, tz, user):
     elif command == '/confirm':
         logger.info('City have been geocoded right')
         user.city = geocoded_city
-        user.user_timezone = tz
+        user.timezone = tz
         finish_registration(message, bot, user)
     else:
         answer_to_invalid_msg(message, bot)
@@ -135,7 +135,7 @@ def confirm_city(message: Message, bot: TeleBot, geocoded_city, tz, user):
 
 def finish_registration(message, bot, user):
     """Sends approval request to admin."""
-    if not check_staff_id(user.id):
+    if not is_staff_id(user.id):
         user.role = PENDING
     elif str(user.id) == ADMIN_ID:
         user.role = ADMIN
@@ -153,7 +153,7 @@ def finish_registration(message, bot, user):
             'Готово! Ожидайте проверки администратором. А пока, '
             'если хотите, можете настроить свой профиль: /profile'
         )
-        if not check_staff_id(user.id) or user.role == DEV:
+        if not is_staff_id(user.id):
             username = user.username
             confirmation_msg = ('Новый пользователь регистрируется '
                                 f'в боте: {user.name}')
@@ -162,12 +162,38 @@ def finish_registration(message, bot, user):
             send_text_message(
                 bot,
                 ADMIN_ID,
-                confirmation_msg + f'. Принять ученика: /confirm_{user.id}'
+                confirmation_msg + f'. Принять ученика: /approve_{user.id}'
             )
         else:
             send_text_message(bot, user.id, 'Вы и есть администратор... '
                                             'Одобрено!')
     logger.info(f'{user.id} successfully registered')
+
+
+def approve(message: Message, bot: TeleBot):
+    """Approves user registration."""
+    user_id = message.chat.id
+    if not is_staff_id(user_id):
+        return answer_to_invalid_msg(message, bot)
+    new_user_id = message.text.split('_')[1]  # type: ignore[union-attr]
+    new_user = get_by_id(User, new_user_id)
+    if new_user.role != PENDING:
+        return send_text_message(bot, user_id, 'Этот пользователь уже одобрен')
+    new_user.role = STUDENT
+    try:
+        update_obj(new_user)
+    except ToUserError as err:
+        send_text_message(bot, user_id, str(err))
+    else:
+        logger.info('New student have been approved: '
+                    f'{new_user.name} {new_user_id}')
+        send_text_message(bot, user_id, 'Пользователь принят в падаваны')
+        send_text_message(
+            bot,
+            new_user_id,
+            'Проверка администратором успешно пройдена! '
+            'Весь функционал бота доступен'
+        )
 
 
 def answer_to_invalid_msg(message: Message, bot: TeleBot):
