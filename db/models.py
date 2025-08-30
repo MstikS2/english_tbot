@@ -49,6 +49,7 @@ class User(NamedModelMixin, Base):
     lessons: Mapped[Optional[list['Lesson']]] = relationship(
         back_populates='student'
     )
+    points: Mapped[int] = mapped_column(SmallInteger(), default=0)
     # No reminder if null:
     remind_time: Mapped[Optional[timedelta]] = mapped_column(
         Interval(),
@@ -96,3 +97,15 @@ class Lesson(IdModelMixin, Base):
     # User will get both GMT datetime and converted to his timezone datetime
     # according to his city.
     lesson_datetime: Mapped[datetime]
+    duration: Mapped[timedelta] = mapped_column(Interval(),
+                                                default=timedelta(hours=1))
+
+
+class Task(IdModelMixin, Base):
+    """The db model for tasks"""
+
+    __tablename__ = 'tasks'
+
+    task: Mapped[str]
+    answer_id: Mapped[int] = mapped_column(ForeignKey('words.id'))
+    answer: Mapped['Word'] = relationship(back_populates='tasks')
