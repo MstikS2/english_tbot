@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
-from sqlalchemy import (DateTime, ForeignKey, Interval, SmallInteger, String,
-                        Text)
+from sqlalchemy import (Column, DateTime, ForeignKey, Interval, SmallInteger,
+                        String, Table, Text)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from typing import Optional
 
@@ -68,6 +68,14 @@ class Category(NamedModelMixin, Base):
     words: Mapped[list['Word']] = relationship(back_populates='category')
 
 
+word_mtm_translation = Table(
+    'word_mtm_translation',
+    Base.metadata,
+    Column('word_id', ForeignKey('words.id'), primary_key=True),
+    Column('translation_id', ForeignKey('translations.id'), primary_key=True)
+)
+
+
 class Translation(NamedModelMixin, Base):
     """The db models for Russian translations of English words."""
 
@@ -75,6 +83,8 @@ class Translation(NamedModelMixin, Base):
 
     category_id: Mapped[int] = mapped_column(ForeignKey('categories.id'))
     category: Mapped['Category'] = relationship(back_populates='translations')
+    words: Mapped[list['Word']] = relationship(secondary=word_mtm_translation,
+                                               back_populates='translations')
 
 
 class Word(NamedModelMixin, Base):
@@ -85,6 +95,10 @@ class Word(NamedModelMixin, Base):
     category_id: Mapped[int] = mapped_column(ForeignKey('categories.id'))
     category: Mapped['Category'] = relationship(back_populates='words')
     tasks: Mapped[list['Task']] = relationship(back_populates='answer')
+    translations: Mapped[list['Translation']] = relationship(
+        secondary=word_mtm_translation,
+        back_populates='words'
+    )
 
 
 class Lesson(IdModelMixin, Base):
