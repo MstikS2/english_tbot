@@ -1,27 +1,15 @@
 from sqlalchemy import select
-from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import sessionmaker
 
 from core.exceptions import ToUserError
 from core.loggers import get_logger
 from db.db_main import engine
+from db.models import User
 
 
 logger = get_logger(__name__)
 
 Session = sessionmaker(bind=engine)
-
-
-# def clear_db():
-#     """"""
-#     meta = MetaData()
-
-#     with closing(engine.connect()) as con:
-#         trans = con.begin()
-#         meta.reflect(bind=engine)
-#         for table in reversed(meta.sorted_tables):
-#             con.execute(table.delete())
-#         trans.commit()
 
 
 def create_obj(obj, Session=Session):
@@ -43,13 +31,18 @@ def create_obj(obj, Session=Session):
 
 def get_by_id(obj_class, id, Session=Session):
     """Returns obj of obj_class with given id or None if it does not exist."""
-    try:
-        with Session() as session:
-            statement = select(obj_class).where(obj_class.id == id)
-            obj = session.scalars(statement).one()
-        return obj
-    except NoResultFound:
-        return None
+    with Session() as session:
+        statement = select(obj_class).where(obj_class.id == id)
+        obj = session.scalars(statement).one_or_none()
+    return obj
+
+
+def get_obj_list_where(obj_class, condition, Session=Session):
+    """Returns a list of objects with given condition."""
+    with Session() as session:
+        statement = select(obj_class).where(condition)
+        students = session.scalars(statement).all()
+    return students
 
 
 def update_obj(obj, Session=Session):

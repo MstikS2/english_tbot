@@ -6,7 +6,7 @@ from bot.permissions import has_debug_permission, is_staff_id
 from core.exceptions import ToUserError
 from core.constants import ADMIN, DEV, PENDING, STRANGER, STUDENT
 from core.loggers import get_logger
-from db.crud import create_obj, get_by_id, update_obj
+from db.crud import create_obj, get_by_id, get_obj_list_where, update_obj
 from db.models import User
 from scripts.env_config import ADMIN_ID, NOMINATIM_USER_AGENT
 from scripts.timezones import get_timezone_by_city
@@ -187,13 +187,30 @@ def approve(message: Message, bot: TeleBot):
     else:
         logger.info('New student have been approved: '
                     f'{new_user.name} {new_user_id}')
-        send_text_message(bot, user_id, 'Пользователь принят в падаваны')
+        send_text_message(
+            bot,
+            user_id,
+            'Пользователь принят в падаваны!\n'
+            f'Редактировать его профиль: /edit_{new_user_id}'
+        )
         send_text_message(
             bot,
             new_user_id,
             'Проверка администратором успешно пройдена! '
             'Весь функционал бота доступен'
         )
+
+
+def check_students(message: Message, bot: TeleBot):
+    """Shows the list of all students."""
+    user_id = message.chat.id
+    if not is_staff_id(user_id):
+        return answer_to_invalid_msg(message, bot)
+    students = get_obj_list_where(User, User.role == STUDENT)
+    list_message = 'Вот список учеников:\n \n'
+    for number, student in enumerate(students):
+        list_message += f'{number + 1}) {student.name}  /edit_{student.id}\n'
+    send_text_message(bot, user_id, list_message)
 
 
 def answer_to_invalid_msg(message: Message, bot: TeleBot):

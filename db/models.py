@@ -84,6 +84,7 @@ class Word(NamedModelMixin, Base):
 
     category_id: Mapped[int] = mapped_column(ForeignKey('categories.id'))
     category: Mapped['Category'] = relationship(back_populates='words')
+    tasks: Mapped[list['Task']] = relationship(back_populates='answer')
 
 
 class Lesson(IdModelMixin, Base):
