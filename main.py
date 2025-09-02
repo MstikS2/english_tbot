@@ -1,7 +1,9 @@
 from telebot import TeleBot
 
-from bot.handlers import (answer_to_invalid_msg, approve, check_interests,
-                          check_profile, check_students, handle_start_message)
+from bot.handlers import (
+    answer_to_invalid_msg, approve, check_interests, check_profile,
+    check_students, edit_profile, handle_start_message
+)
 from bot.settings import DEBUG
 from core.loggers import get_logger
 from scripts.env_config import DEBUG_TOKEN, WORKER_TOKEN
@@ -23,6 +25,8 @@ def register_handlers(bot: TeleBot):
     bot.register_message_handler(check_profile, regexp=r'^\/profile(_\d+)?$',
                                  pass_bot=True)
     bot.register_message_handler(check_students, commands=['students'],
+                                 pass_bot=True)
+    bot.register_message_handler(edit_profile, regexp=r'^\/edit(_\d+)?$',
                                  pass_bot=True)
     bot.register_message_handler(handle_start_message, commands=['start'],
                                  pass_bot=True)

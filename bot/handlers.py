@@ -2,12 +2,13 @@ from telebot import TeleBot
 from telebot.apihelper import ApiException
 from telebot.types import Message
 
-from bot.permissions import has_debug_permission, is_staff_id
+from bot.permissions import has_debug_permission, is_staff_id, is_user_or_staff
 from core.exceptions import ToUserError
 from core.constants import ADMIN, DEV, PENDING, STRANGER, STUDENT
 from core.loggers import get_logger
 from core.views import field_or_unknown
-from db.crud import create_obj, get_by_id, get_obj_list_where, update_obj
+from db.crud import (create_obj, get_by_id, get_obj_list_where, object_exists,
+                     update_obj)
 from db.models import User
 from scripts.env_config import ADMIN_ID, NOMINATIM_USER_AGENT
 from scripts.timezones import get_timezone_by_city
@@ -21,9 +22,9 @@ def extract_user(asker_id, command, message: Message, bot: TeleBot):
     items = command.split('_')  # type: ignore[union-attr]
     if len(items) > 1:
         inspected_id = int(items[1])
-        command_postscript = f'_{inspected_id}'
-        if inspected_id != asker_id and not is_staff_id(asker_id):
+        if not is_user_or_staff(inspected_id, asker_id):
             return answer_to_invalid_msg(message, bot)
+        command_postscript = f'_{inspected_id}'
     else:
         inspected_id = asker_id
         command_postscript = ''
@@ -34,8 +35,9 @@ def extract_user(asker_id, command, message: Message, bot: TeleBot):
         send_text_message(
             bot,
             asker_id,
-            'Что-то пошло не так! '
-            'Пожалуйста, сообщите администратору или попробуйте позже'
+            'Что-то пошло не так! Кажется, такого пользователя не существует.'
+            'Если вы уверены, что всё делали правильно, пожалуйста, сообщите '
+            'администратору или попробуйте позже'
         )
         raise ValueError
     return inspected_user, command_postscript
@@ -51,6 +53,7 @@ def send_text_message(bot: TeleBot, chat_id, message: str):
         logger.error(f'Не уалось отправить сообщение: "{message}"')
 
 
+# Registration section (step by step):
 def handle_start_message(message: Message, bot: TeleBot):
     """
     Handles /start and:
@@ -230,6 +233,7 @@ def approve(message: Message, bot: TeleBot):
             'Проверка администратором успешно пройдена! '
             'Весь функционал бота доступен'
         )
+# End of registration section
 
 
 def check_interests(message: Message, bot: TeleBot):
@@ -246,14 +250,14 @@ def check_interests(message: Message, bot: TeleBot):
         '\U0001F3AD Интересы: '
         f'{field_or_unknown(inspected_user.interests)}\n\n'
         '\U0001F4D7 Любимые книги: '
-        f'{field_or_unknown(inspected_user.favorite_books)}\n\n'
+        f'{field_or_unknown(inspected_user.books)}\n\n'
         '\U0001F3AC Любимые фильмы: '
-        f'{field_or_unknown(inspected_user.favorite_films)}\n\n'
+        f'{field_or_unknown(inspected_user.films)}\n\n'
         '\U0001F3AF Любимые игры: '
-        f'{field_or_unknown(inspected_user.favorite_games)}\n\n'
+        f'{field_or_unknown(inspected_user.games)}\n\n'
         '\U0001F3B6 Любимая музыка: '
-        f'{field_or_unknown(inspected_user.favorite_music)}\n\n'
-        f'Обновить интересы: /update_interests{command_postscript}'
+        f'{field_or_unknown(inspected_user.music)}\n\n'
+        f'Редактировать: /edit_{inspected_user.id}'
     )
     send_text_message(bot, user_id, interests_msg)
 
@@ -275,7 +279,7 @@ def check_profile(message: Message, bot: TeleBot):
         f'\U000023F3 Возраст: {field_or_unknown(inspected_user.age)}\n'
         f'\U0001F306 Город: {inspected_user.city}\n'
         '\U0001F4F1 Номер телефона: '
-        f'{field_or_unknown(inspected_user.phone_number)}\n\n'
+        f'{field_or_unknown(inspected_user.phonenumber)}\n\n'
         f'\U0001FA99 Баллы: {inspected_user.points}\n'
     )
     if is_staff_id(user_id):
@@ -287,7 +291,7 @@ def check_profile(message: Message, bot: TeleBot):
             f'\U0001F46E Роль: {inspected_user.role}\n'
             f'\U0001F30D Часовой пояс: {inspected_user.timezone}\n'
             '\U0001F55C Установленное пользователем время напоминаний '
-            f'о занятиях: {inspected_user.remind_time}\n'
+            f'о занятиях: {inspected_user.remindtime}\n'
             f'\U0001F3C5 Успеваемость: {inspected_user.rating}\n'
             f'\U0001F3EB Назначенные занятия:\n'
         )
@@ -318,6 +322,40 @@ def check_students(message: Message, bot: TeleBot):
     for number, student in enumerate(students):
         list_message += f'{number + 1}) {student.name} /profile_{student.id}\n'
     send_text_message(bot, user_id, list_message)
+
+
+def edit_profile(message: Message, bot: TeleBot):
+    """Shows commands to edit the profile."""
+    user_id = message.chat.id
+    logger.info(f'Message recieved:{message.text} by {user_id}')
+    inspected_id = int(message.text.split('_')[1])  # type: ignore[union-attr]
+    if (not is_user_or_staff(inspected_id, user_id) or
+       not object_exists(User, inspected_id)):
+        return answer_to_invalid_msg(message, bot)
+    command_root = f'/update_{inspected_id}_'
+    edit_message = (
+        f'Изменить имя: {command_root}name\n'
+        f'Изменить возраст: {command_root}age\n'
+        f'Изменить город: {command_root}city\n'
+        f'Изменить номер телефона: {command_root}phonenumber\n\n'
+        f'Изменить интересы: {command_root}interests\n'
+        f'Изменить любимые книги: {command_root}books\n'
+        f'Изменить любимые фильмы: {command_root}films\n'
+        f'Изменить любимые игры: {command_root}games\n'
+        f'Изменить любимую музыку: {command_root}music'
+    )
+    if is_staff_id(user_id):
+        edit_message += (
+            '\n\n\U0000203C\U0000203C\U0000203C Опасная зона! Эти поля может '
+            'изменять только админ (вы). Пользуйтесь этим только если точно '
+            'знаете, что делаете \U0000203C\U0000203C\U0000203C\n\n'
+            f'Изменить юзернейм(@): {command_root}username\n'
+            f'Изменить роль: {command_root}role\n'
+            f'Изменить часовой пояс: {command_root}timezone\n'
+            f'Изменить время напоминания: {command_root}remindtime\n'
+            f'Изменить успеваемость: {command_root}rating'
+        )
+    send_text_message(bot, user_id, edit_message)
 
 
 def answer_to_invalid_msg(message: Message, bot: TeleBot):

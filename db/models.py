@@ -29,7 +29,7 @@ class User(NamedModelMixin, Base):
     city: Mapped[str] = mapped_column(
         String(MAX_CITY_LEN), server_default=DEFAULT_CITY
     )
-    phone_number: Mapped[Optional[str]] = mapped_column(
+    phonenumber: Mapped[Optional[str]] = mapped_column(
         String(MAX_PHONE_NUMBER_LEN)
     )
     role: Mapped[Optional[str]] = mapped_column(default=STRANGER)
@@ -38,10 +38,10 @@ class User(NamedModelMixin, Base):
 
     # Student interests section:
     interests: Mapped[Optional[str]]
-    favorite_books: Mapped[Optional[str]]
-    favorite_films: Mapped[Optional[str]]
-    favorite_games: Mapped[Optional[str]]
-    favorite_music: Mapped[Optional[str]]
+    books: Mapped[Optional[str]]
+    films: Mapped[Optional[str]]
+    games: Mapped[Optional[str]]
+    music: Mapped[Optional[str]]
 
     # Education section:
     rating: Mapped[int] = mapped_column(SmallInteger(), default=0)
@@ -51,7 +51,7 @@ class User(NamedModelMixin, Base):
     )
     points: Mapped[int] = mapped_column(SmallInteger(), default=0)
     # No reminder if null:
-    remind_time: Mapped[Optional[timedelta]] = mapped_column(
+    remindtime: Mapped[Optional[timedelta]] = mapped_column(
         Interval(),
         default=timedelta(hours=1)
     )

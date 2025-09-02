@@ -1,5 +1,6 @@
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, sessionmaker
+from sqlalchemy.sql import exists
 
 from core.exceptions import ToUserError
 from core.loggers import get_logger
@@ -46,6 +47,12 @@ def get_obj_list_where(obj_class, condition, Session=Session):
         )
         students = session.scalars(statement).all()
     return students
+
+
+def object_exists(obj_class, id):
+    """Checks if object with given id exists in db."""
+    with Session() as session:
+        return session.query(exists().where(obj_class.id == id)).scalar()
 
 
 def update_obj(obj, Session=Session):
