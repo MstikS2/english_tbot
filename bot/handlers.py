@@ -6,6 +6,7 @@ from bot.permissions import has_debug_permission, is_staff_id
 from core.exceptions import ToUserError
 from core.constants import ADMIN, DEV, PENDING, STRANGER, STUDENT
 from core.loggers import get_logger
+from core.views import field_or_unknown
 from db.crud import create_obj, get_by_id, get_obj_list_where, update_obj
 from db.models import User
 from scripts.env_config import ADMIN_ID, NOMINATIM_USER_AGENT
@@ -13,6 +14,31 @@ from scripts.timezones import get_timezone_by_city
 
 
 logger = get_logger(__name__)
+
+
+def extract_user(asker_id, command, message: Message, bot: TeleBot):
+    """Extracts user object from /command_id-like command."""
+    items = command.split('_')  # type: ignore[union-attr]
+    if len(items) > 1:
+        inspected_id = int(items[1])
+        command_postscript = f'_{inspected_id}'
+        if inspected_id != asker_id and not is_staff_id(asker_id):
+            return answer_to_invalid_msg(message, bot)
+    else:
+        inspected_id = asker_id
+        command_postscript = ''
+    inspected_user = get_by_id(User, inspected_id)
+    if not inspected_user:
+        logger.error(f'User {asker_id} inspected non-existent user '
+                     f'{inspected_user}')
+        send_text_message(
+            bot,
+            asker_id,
+            'Что-то пошло не так! '
+            'Пожалуйста, сообщите администратору или попробуйте позже'
+        )
+        raise ValueError
+    return inspected_user, command_postscript
 
 
 def send_text_message(bot: TeleBot, chat_id, message: str):
@@ -206,40 +232,50 @@ def approve(message: Message, bot: TeleBot):
         )
 
 
+def check_interests(message: Message, bot: TeleBot):
+    """Shows the information about user interests."""
+    user_id = message.chat.id
+    command = message.text
+    logger.info(f'Message recieved:{command} by {user_id}')
+    try:
+        inspected_user, command_postscript = extract_user(user_id, command,
+                                                          message, bot)
+    except ValueError:
+        return None
+    interests_msg = (
+        '\U0001F3AD Интересы: '
+        f'{field_or_unknown(inspected_user.interests)}\n\n'
+        '\U0001F4D7 Любимые книги: '
+        f'{field_or_unknown(inspected_user.favorite_books)}\n\n'
+        '\U0001F3AC Любимые фильмы: '
+        f'{field_or_unknown(inspected_user.favorite_films)}\n\n'
+        '\U0001F3AF Любимые игры: '
+        f'{field_or_unknown(inspected_user.favorite_games)}\n\n'
+        '\U0001F3B6 Любимая музыка: '
+        f'{field_or_unknown(inspected_user.favorite_music)}\n\n'
+        f'Обновить интересы: /update_interests{command_postscript}'
+    )
+    send_text_message(bot, user_id, interests_msg)
+
+
 def check_profile(message: Message, bot: TeleBot):
     """Shows the information about user."""
     user_id = message.chat.id
     command = message.text
     logger.info(f'Message recieved:{command} by {user_id}')
-    items = command.split('_')  # type: ignore[union-attr]
-    if len(items) > 1:
-        inspected_id = int(items[1])
-        interests_command = f'interests_{inspected_id}'
-        if inspected_id != user_id and not is_staff_id(user_id):
-            return answer_to_invalid_msg(message, bot)
-    else:
-        inspected_id = user_id
-        interests_command = 'interests'
-    inspected_user = get_by_id(User, inspected_id)
-    if not inspected_user:
-        logger.error(f'User {user_id} inspected non-existent user '
-                     f'{inspected_user}')
-        return send_text_message(
-            bot,
-            user_id,
-            'Что-то пошло не так! '
-            'Пожалуйста, сообщите администратору или попробуйте позже'
-        )
+    try:
+        inspected_user, command_postscript = extract_user(user_id, command,
+                                                          message, bot)
+    except ValueError:
+        return None
     profile_msg = (
         '\U0001F464 Профиль пользователя:\n\n'
-        f'\U00000023\U000020E3 ID: {inspected_id}\n'
+        f'\U00000023\U000020E3 ID: {inspected_user.id}\n'
         f'\U0001F64E Имя: {inspected_user.name}\n'
-        '\U000023F3 Возраст: '
-        f'{inspected_user.age if inspected_user.age else 'не указано'}\n'
+        f'\U000023F3 Возраст: {field_or_unknown(inspected_user.age)}\n'
         f'\U0001F306 Город: {inspected_user.city}\n'
         '\U0001F4F1 Номер телефона: '
-        '{}\n\n'.format(inspected_user.phone_number
-                        if inspected_user.phone_number else 'не указано') +
+        f'{field_or_unknown(inspected_user.phone_number)}\n\n'
         f'\U0001FA99 Баллы: {inspected_user.points}\n'
     )
     if is_staff_id(user_id):
@@ -262,8 +298,8 @@ def check_profile(message: Message, bot: TeleBot):
         else:
             profile_msg += 'Не назначено ни одного занятия\n'
     profile_msg += (
-        f'\nИнтересы: /{interests_command}\n'
-        f'Редактировать профиль: /edit_{inspected_id}'
+        f'\nИнтересы: /interests{command_postscript}\n'
+        f'Редактировать профиль: /edit_{inspected_user.id}'
     )
     send_text_message(bot, user_id, profile_msg)
 

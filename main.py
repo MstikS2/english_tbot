@@ -1,7 +1,7 @@
 from telebot import TeleBot
 
-from bot.handlers import (answer_to_invalid_msg, approve, check_profile,
-                          check_students, handle_start_message)
+from bot.handlers import (answer_to_invalid_msg, approve, check_interests,
+                          check_profile, check_students, handle_start_message)
 from bot.settings import DEBUG
 from core.loggers import get_logger
 from scripts.env_config import DEBUG_TOKEN, WORKER_TOKEN
@@ -14,10 +14,12 @@ bot = TeleBot(token=DEBUG_TOKEN if DEBUG
               else WORKER_TOKEN)  # type: ignore[arg-type]
 
 
-def main():
-    """The main bot logic."""
+def register_handlers(bot: TeleBot):
+    """Registers all bot handlers."""
     bot.register_message_handler(approve, regexp=r'^\/approve_\d+$',
                                  pass_bot=True)
+    bot.register_message_handler(check_interests,
+                                 regexp=r'^\/interests(_\d+)?$', pass_bot=True)
     bot.register_message_handler(check_profile, regexp=r'^\/profile(_\d+)?$',
                                  pass_bot=True)
     bot.register_message_handler(check_students, commands=['students'],
@@ -27,6 +29,12 @@ def main():
     bot.register_message_handler(answer_to_invalid_msg, pass_bot=True)
 
     logger.info('Handlers have been registered')
+
+
+def main():
+    """The main bot logic."""
+    register_handlers(bot)
+
     bot.polling(interval=2)
 
 
