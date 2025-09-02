@@ -1,10 +1,9 @@
 from sqlalchemy import select
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import selectinload, sessionmaker
 
 from core.exceptions import ToUserError
 from core.loggers import get_logger
 from db.db_main import engine
-from db.models import User
 
 
 logger = get_logger(__name__)
@@ -32,7 +31,9 @@ def create_obj(obj, Session=Session):
 def get_by_id(obj_class, id, Session=Session):
     """Returns obj of obj_class with given id or None if it does not exist."""
     with Session() as session:
-        statement = select(obj_class).where(obj_class.id == id)
+        statement = select(obj_class).where(obj_class.id == id).options(
+            selectinload('*')
+        )
         obj = session.scalars(statement).one_or_none()
     return obj
 
@@ -40,7 +41,9 @@ def get_by_id(obj_class, id, Session=Session):
 def get_obj_list_where(obj_class, condition, Session=Session):
     """Returns a list of objects with given condition."""
     with Session() as session:
-        statement = select(obj_class).where(condition)
+        statement = select(obj_class).where(condition).options(
+            selectinload('*')
+        )
         students = session.scalars(statement).all()
     return students
 
