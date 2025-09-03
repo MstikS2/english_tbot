@@ -85,7 +85,7 @@ def handle_start_message(message: Message, bot: TeleBot):
             bot,
             user_id,
             'Вы уже прошли регистрацию!',
-            markup=None if user.role == PENDING else profile_markup())
+            markup=profile_markup())
     elif not user:
         logger.info(f'New user started the bot: {user_id}')
         try:
@@ -393,6 +393,16 @@ def edit_profile(message: Message, bot: TeleBot):
     send_text_message(bot, user_id, edit_message, markup=profile_markup())
 
 
+def handle_help(message: Message, bot: TeleBot):
+    """Sends the user a list of basic commands."""
+    user_id = get_user_id(message)
+    help_msg = (f'/profile - профиль\n/edit_{user_id} - изменение профиля\n'
+                '/remind - установить время напоминания о занятиях')
+    if is_staff_id(user_id):
+        help_msg += '\n/students - ученики'
+    send_text_message(bot, user_id, help_msg, markup=profile_markup())
+
+
 def handle_user_field_update(message: Message, bot: TeleBot):
     """Handles update command for fields and registers handler for getting new
     field value."""
@@ -443,7 +453,7 @@ def update_user_field(message: Message, bot: TeleBot, field, user):
         bot.register_next_step_handler(message, update_user_field, bot, field,
                                        user)
     else:
-        send_text_message(bot, user_id, 'Поле успешно обновлено! /profile',
+        send_text_message(bot, user_id, 'Поле успешно обновлено!',
                           markup=profile_markup())
         logger.info(f'User {user_id} succcessfully updated '
                     f'{field} of {user.id}')
