@@ -1,13 +1,18 @@
 from datetime import datetime, timedelta
 
+from pytz import all_timezones
 from sqlalchemy import (Column, DateTime, ForeignKey, Interval, SmallInteger,
                         String, Table, Text)
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import (DeclarativeBase, Mapped, mapped_column,
+                            relationship, validates)
 from typing import Optional
 
-from core.constants import (DEFAULT_CITY, DEFAULT_TZ, MAX_CITY_LEN,
-                            MAX_USERNAME_LEN, MAX_PHONE_NUMBER_LEN, STRANGER)
+from core.constants import (
+    DEFAULT_CITY, DEFAULT_TZ, INT_USER_FIELDS, MAX_CITY_LEN, MAX_USERNAME_LEN,
+    MAX_PHONE_NUMBER_LEN, STRANGER, USER_ROLES
+)
 from core.models import IdModelMixin, NamedModelMixin
+from core.exceptions import ToUserError
 
 
 class Base(DeclarativeBase):
@@ -29,7 +34,7 @@ class User(NamedModelMixin, Base):
     city: Mapped[str] = mapped_column(
         String(MAX_CITY_LEN), server_default=DEFAULT_CITY
     )
-    phone_number: Mapped[Optional[str]] = mapped_column(
+    phonenumber: Mapped[Optional[str]] = mapped_column(
         String(MAX_PHONE_NUMBER_LEN)
     )
     role: Mapped[Optional[str]] = mapped_column(default=STRANGER)
@@ -38,10 +43,10 @@ class User(NamedModelMixin, Base):
 
     # Student interests section:
     interests: Mapped[Optional[str]]
-    favorite_books: Mapped[Optional[str]]
-    favorite_films: Mapped[Optional[str]]
-    favorite_games: Mapped[Optional[str]]
-    favorite_music: Mapped[Optional[str]]
+    books: Mapped[Optional[str]]
+    films: Mapped[Optional[str]]
+    games: Mapped[Optional[str]]
+    music: Mapped[Optional[str]]
 
     # Education section:
     rating: Mapped[int] = mapped_column(SmallInteger(), default=0)
@@ -51,10 +56,38 @@ class User(NamedModelMixin, Base):
     )
     points: Mapped[int] = mapped_column(SmallInteger(), default=0)
     # No reminder if null:
-    remind_time: Mapped[Optional[timedelta]] = mapped_column(
+    remindtime: Mapped[Optional[timedelta]] = mapped_column(
         Interval(),
         default=timedelta(hours=1)
     )
+
+    @validates('role')
+    def validate_role(self, key, value):
+        """Checks if role is valid."""
+        if value not in USER_ROLES:
+            raise ToUserError('Роль должна соответствовать одному из этих '
+                              f'значений: {USER_ROLES}')
+        return value
+
+    @validates('timezone')
+    def validate_timezone(self, key, value):
+        """Checks if timezone is given in the correct format"""
+        if value not in all_timezones:
+            raise ToUserError(
+                'Часовой пояс должен быть представлен в верном формате. Список'
+                ' всех валидных часовых поясов можно посмотреть здесь:\n'
+                'https://mljar.com/blog/list-pytz-timezones/'
+            )
+        return value
+
+    @validates(*INT_USER_FIELDS)
+    def validate_ints(self, key, value):
+        """Checks if given value is int."""
+        try:
+            if value is not None:
+                return int(value)
+        except ValueError:
+            raise ToUserError('Пожалуйста, укажите значение числом')
 
 
 class Category(NamedModelMixin, Base):
