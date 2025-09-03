@@ -23,8 +23,11 @@ def register_handlers(bot: TeleBot):
                                  pass_bot=True)
     bot.register_message_handler(check_interests,
                                  regexp=r'^\/interests(_\d+)?$', pass_bot=True)
-    bot.register_message_handler(check_profile, regexp=r'^\/profile(_\d+)?$',
-                                 pass_bot=True)
+    bot.register_message_handler(
+        check_profile,
+        regexp=r'^(\/profile(_\d+)?)$|^\U0001F464Профиль$',
+        pass_bot=True
+    )
     bot.register_message_handler(check_students, commands=['students'],
                                  pass_bot=True)
     bot.register_message_handler(edit_profile, regexp=r'^\/edit_\d+$',

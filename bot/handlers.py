@@ -2,6 +2,7 @@ from telebot import TeleBot
 from telebot.apihelper import ApiException
 from telebot.types import Message
 
+from bot.markups import profile_markup
 from bot.permissions import (
     has_debug_permission, has_field_changing_permission, is_staff_id,
     is_user_or_staff
@@ -47,20 +48,23 @@ def extract_user(asker_id, command, message: Message, bot: TeleBot):
             asker_id,
             'Что-то пошло не так! Кажется, такого пользователя не существует. '
             'Если вы уверены, что всё делали правильно, пожалуйста, сообщите '
-            'администратору или попробуйте позже'
+            'администратору или попробуйте позже',
+            markup=profile_markup()
         )
         raise ValueError
     return inspected_user, command_postscript
 
 
-def send_text_message(bot: TeleBot, chat_id, message: str):
+def send_text_message(bot: TeleBot, chat_id, message: str, markup=None):
     """Sends a text message to Telegram-chat."""
     try:
-        bot.send_message(chat_id=chat_id, text=message)
+        bot.send_message(chat_id=chat_id, text=message,
+                         reply_markup=markup)
         logger.info(f'Успешно отправлено сообщение: "{message}"'
                     f'в чат {chat_id}')
-    except ApiException:
-        logger.error(f'Не уалось отправить сообщение: "{message}"')
+    except ApiException as err:
+        logger.error(f'Не уалось отправить сообщение: "{message}". Текст '
+                     f'ошибки: {err}')
 
 
 # Registration section (step by step):
@@ -77,7 +81,11 @@ def handle_start_message(message: Message, bot: TeleBot):
                                                'testing. Go away!')
     user = get_by_id(User, user_id)
     if user and user.role != STRANGER:
-        return send_text_message(bot, user_id, 'Вы уже прошли регистрацию!')
+        return send_text_message(
+            bot,
+            user_id,
+            'Вы уже прошли регистрацию!',
+            markup=None if user.role == PENDING else profile_markup())
     elif not user:
         logger.info(f'New user started the bot: {user_id}')
         try:
@@ -175,7 +183,8 @@ def confirm_city(message: Message, bot: TeleBot, geocoded_city, tz, user):
                 bot.register_next_step_handler(message, confirm_city, bot,
                                                user)
             else:
-                send_text_message(bot, user.id, 'Город упешно изменён!')
+                send_text_message(bot, user.id, 'Город упешно изменён!',
+                                  markup=profile_markup())
                 logger.info(f'{user.id} successfully changed his city to'
                             f'{geocoded_city}')
 
@@ -213,11 +222,16 @@ def finish_registration(message, bot, user):
             send_text_message(
                 bot,
                 ADMIN_ID,
-                confirmation_msg + f'. Принять ученика: /approve_{user.id}'
+                confirmation_msg + f'. Принять ученика: /approve_{user.id}',
+                markup=profile_markup()
             )
         else:
-            send_text_message(bot, user.id, 'Вы и есть администратор... '
-                                            'Одобрено!')
+            send_text_message(
+                bot,
+                user.id,
+                'Вы и есть администратор...  Одобрено!',
+                markup=profile_markup()
+            )
     logger.info(f'{user.id} successfully registered')
 
 
@@ -229,12 +243,13 @@ def approve(message: Message, bot: TeleBot):
     new_user_id = int(message.text.split('_')[1])  # type: ignore[union-attr]
     new_user = get_by_id(User, new_user_id)
     if new_user.role != PENDING:
-        return send_text_message(bot, user_id, 'Этот пользователь уже одобрен')
+        return send_text_message(bot, user_id, 'Этот пользователь уже одобрен',
+                                 markup=profile_markup())
     new_user.role = STUDENT
     try:
         update_obj(new_user)
     except ToUserError as err:
-        send_text_message(bot, user_id, str(err))
+        send_text_message(bot, user_id, str(err), markup=profile_markup())
     else:
         logger.info('New student have been approved: '
                     f'{new_user.name} {new_user_id}')
@@ -242,13 +257,15 @@ def approve(message: Message, bot: TeleBot):
             bot,
             user_id,
             'Пользователь принят в падаваны!\n'
-            f'Его профиль: /profile_{new_user_id}'
+            f'Его профиль: /profile_{new_user_id}',
+            markup=profile_markup()
         )
         send_text_message(
             bot,
             new_user_id,
             'Проверка администратором успешно пройдена! '
-            'Весь функционал бота доступен'
+            'Весь функционал бота доступен',
+            markup=profile_markup()
         )
 # End of registration section
 
@@ -275,7 +292,7 @@ def check_interests(message: Message, bot: TeleBot):
         f'{field_or_unknown(inspected_user.music)}\n\n'
         f'Редактировать: /edit_{inspected_user.id}'
     )
-    send_text_message(bot, user_id, interests_msg)
+    send_text_message(bot, user_id, interests_msg, markup=profile_markup())
 
 
 def check_profile(message: Message, bot: TeleBot):
@@ -320,7 +337,7 @@ def check_profile(message: Message, bot: TeleBot):
         f'\nИнтересы: /interests{command_postscript}\n'
         f'Редактировать профиль: /edit_{inspected_user.id}'
     )
-    send_text_message(bot, user_id, profile_msg)
+    send_text_message(bot, user_id, profile_msg, markup=profile_markup())
 
 
 def check_students(message: Message, bot: TeleBot):
@@ -330,12 +347,16 @@ def check_students(message: Message, bot: TeleBot):
         return answer_to_invalid_msg(message, bot)
     students = get_obj_list_where(User, User.role == STUDENT)
     if not students:
-        return send_text_message(bot, user_id, 'У вас пока нет учеников '
-                                               '\U0001F615')
+        return send_text_message(
+            bot,
+            user_id,
+            'У вас пока нет учеников \U0001F615',
+            markup=profile_markup()
+        )
     list_message = 'Вот список учеников:\n\n'
     for number, student in enumerate(students):
         list_message += f'{number + 1}) {student.name} /profile_{student.id}\n'
-    send_text_message(bot, user_id, list_message)
+    send_text_message(bot, user_id, list_message, markup=profile_markup())
 
 
 def edit_profile(message: Message, bot: TeleBot):
@@ -369,7 +390,7 @@ def edit_profile(message: Message, bot: TeleBot):
             f'Изменить успеваемость: {command_root}rating\n'
             f'Изменить баллы: {command_root}points'
         )
-    send_text_message(bot, user_id, edit_message)
+    send_text_message(bot, user_id, edit_message, markup=profile_markup())
 
 
 def handle_user_field_update(message: Message, bot: TeleBot):
@@ -388,7 +409,8 @@ def handle_user_field_update(message: Message, bot: TeleBot):
             user_id,
             'Что-то пошло не так! Кажется, такого пользователя не существует. '
             'Если вы уверены, что всё делали правильно, пожалуйста, сообщите '
-            'администратору или попробуйте позже'
+            'администратору или попробуйте позже',
+            markup=profile_markup()
         )
     if field == 'city':
         send_text_message(bot, user_id, 'Введите город, по часовому поясу '
@@ -406,7 +428,8 @@ def update_user_field(message: Message, bot: TeleBot, field, user):
     user_id = get_user_id(message)
     new_value = message.text
     if new_value == '/cancel':
-        return send_text_message(bot, user_id, 'Отменено')
+        return send_text_message(bot, user_id, 'Отменено',
+                                 markup=profile_markup())
     # Saving old name in case user updating it so report about update for admin
     # is possible:
     old_name = user.name
@@ -420,7 +443,8 @@ def update_user_field(message: Message, bot: TeleBot, field, user):
         bot.register_next_step_handler(message, update_user_field, bot, field,
                                        user)
     else:
-        send_text_message(bot, user_id, 'Поле успешно обновлено! /profile')
+        send_text_message(bot, user_id, 'Поле успешно обновлено! /profile',
+                          markup=profile_markup())
         logger.info(f'User {user_id} succcessfully updated '
                     f'{field} of {user.id}')
         if not is_staff_id(user_id):
@@ -428,7 +452,8 @@ def update_user_field(message: Message, bot: TeleBot, field, user):
                 bot,
                 ADMIN_ID,
                 f'Пользователь {old_name} обновил поле {field} следующей '
-                f'информацией:\n\n{new_value}'
+                f'информацией:\n\n{new_value}',
+                markup=profile_markup()
             )
 
 
