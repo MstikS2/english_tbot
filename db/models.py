@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+from pytz import all_timezones
 from sqlalchemy import (Column, DateTime, ForeignKey, Interval, SmallInteger,
                         String, Table, Text)
 from sqlalchemy.orm import (DeclarativeBase, Mapped, mapped_column,
@@ -62,15 +63,26 @@ class User(NamedModelMixin, Base):
 
     @validates('role')
     def validate_role(self, key, value):
-        try:
-            assert value in USER_ROLES
-        except AssertionError:
+        """Checks if role is valid."""
+        if value not in USER_ROLES:
             raise ToUserError('Роль должна соответствовать одному из этих '
                               f'значений: {USER_ROLES}')
         return value
 
+    @validates('timezone')
+    def validate_timezone(self, key, value):
+        """Checks if timezone is given in the correct format"""
+        if value not in all_timezones:
+            raise ToUserError(
+                'Часовой пояс должен быть представлен в верном формате. Список'
+                ' всех валидных часовых поясов можно посмотреть здесь:\n'
+                'https://mljar.com/blog/list-pytz-timezones/'
+            )
+        return value
+
     @validates(*INT_USER_FIELDS)
     def validate_ints(self, key, value):
+        """Checks if given value is int."""
         try:
             if value is not None:
                 return int(value)
