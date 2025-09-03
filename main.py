@@ -2,7 +2,8 @@ from telebot import TeleBot
 
 from bot.handlers import (
     answer_to_invalid_msg, approve, check_interests, check_profile,
-    check_students, edit_profile, handle_start_message
+    check_students, edit_profile, handle_start_message,
+    handle_user_field_update
 )
 from bot.settings import DEBUG
 from core.loggers import get_logger
@@ -26,10 +27,15 @@ def register_handlers(bot: TeleBot):
                                  pass_bot=True)
     bot.register_message_handler(check_students, commands=['students'],
                                  pass_bot=True)
-    bot.register_message_handler(edit_profile, regexp=r'^\/edit(_\d+)?$',
+    bot.register_message_handler(edit_profile, regexp=r'^\/edit_\d+$',
                                  pass_bot=True)
     bot.register_message_handler(handle_start_message, commands=['start'],
                                  pass_bot=True)
+    bot.register_message_handler(
+        handle_user_field_update,
+        regexp=r'^\/update_\d+_[a-z]+$',
+        pass_bot=True
+    )
     bot.register_message_handler(answer_to_invalid_msg, pass_bot=True)
 
     logger.info('Handlers have been registered')

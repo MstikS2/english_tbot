@@ -2,12 +2,16 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import (Column, DateTime, ForeignKey, Interval, SmallInteger,
                         String, Table, Text)
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import (DeclarativeBase, Mapped, mapped_column,
+                            relationship, validates)
 from typing import Optional
 
-from core.constants import (DEFAULT_CITY, DEFAULT_TZ, MAX_CITY_LEN,
-                            MAX_USERNAME_LEN, MAX_PHONE_NUMBER_LEN, STRANGER)
+from core.constants import (
+    DEFAULT_CITY, DEFAULT_TZ, INT_USER_FIELDS, MAX_CITY_LEN, MAX_USERNAME_LEN,
+    MAX_PHONE_NUMBER_LEN, STRANGER, USER_ROLES
+)
 from core.models import IdModelMixin, NamedModelMixin
+from core.exceptions import ToUserError
 
 
 class Base(DeclarativeBase):
@@ -55,6 +59,23 @@ class User(NamedModelMixin, Base):
         Interval(),
         default=timedelta(hours=1)
     )
+
+    @validates('role')
+    def validate_role(self, key, value):
+        try:
+            assert value in USER_ROLES
+        except AssertionError:
+            raise ToUserError('Роль должна соответствовать одному из этих '
+                              f'значений: {USER_ROLES}')
+        return value
+
+    @validates(*INT_USER_FIELDS)
+    def validate_ints(self, key, value):
+        try:
+            if value is not None:
+                return int(value)
+        except ValueError:
+            raise ToUserError('Пожалуйста, укажите значение числом')
 
 
 class Category(NamedModelMixin, Base):

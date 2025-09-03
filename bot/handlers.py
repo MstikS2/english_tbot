@@ -2,19 +2,29 @@ from telebot import TeleBot
 from telebot.apihelper import ApiException
 from telebot.types import Message
 
-from bot.permissions import has_debug_permission, is_staff_id, is_user_or_staff
+from bot.permissions import (
+    has_debug_permission, has_field_changing_permission, is_staff_id,
+    is_user_or_staff
+)
 from core.exceptions import ToUserError
 from core.constants import ADMIN, DEV, PENDING, STRANGER, STUDENT
 from core.loggers import get_logger
-from core.views import field_or_unknown
 from db.crud import (create_obj, get_by_id, get_obj_list_where, object_exists,
                      update_obj)
 from db.models import User
 from scripts.env_config import ADMIN_ID, NOMINATIM_USER_AGENT
 from scripts.timezones import get_timezone_by_city
+from scripts.views import field_or_unknown
 
 
 logger = get_logger(__name__)
+
+
+def get_user_id(message: Message):
+    """Extracts user id from Message object and logs it."""
+    user_id = message.chat.id
+    logger.info(f'Message recieved:{message.text} by {user_id}')
+    return user_id
 
 
 def extract_user(asker_id, command, message: Message, bot: TeleBot):
@@ -35,7 +45,7 @@ def extract_user(asker_id, command, message: Message, bot: TeleBot):
         send_text_message(
             bot,
             asker_id,
-            'Что-то пошло не так! Кажется, такого пользователя не существует.'
+            'Что-то пошло не так! Кажется, такого пользователя не существует. '
             'Если вы уверены, что всё делали правильно, пожалуйста, сообщите '
             'администратору или попробуйте позже'
         )
@@ -61,9 +71,7 @@ def handle_start_message(message: Message, bot: TeleBot):
     2) Creates User object for new users;
     3) Register ask_name handler.
     """
-    chat = message.chat
-    user_id = chat.id
-    logger.info(f'Message recieved:{message.text} by {user_id}')
+    user_id = get_user_id(message)
     if not has_debug_permission(user_id):
         return send_text_message(bot, user_id, 'You are not allowed to '
                                                'testing. Go away!')
@@ -73,7 +81,7 @@ def handle_start_message(message: Message, bot: TeleBot):
     elif not user:
         logger.info(f'New user started the bot: {user_id}')
         try:
-            create_obj(User(id=user_id, username=chat.username))
+            create_obj(User(id=user_id, username=message.chat.username))
         except ToUserError as err:
             return send_text_message(bot, user_id, str(err))
     send_text_message(bot, user_id, 'Добро пожаловать! Давайте знакомиться. '
@@ -83,9 +91,8 @@ def handle_start_message(message: Message, bot: TeleBot):
 
 def get_name(message: Message, bot: TeleBot):
     """Gets user's name, updates users's db object and asks for user's city."""
-    user_id = message.chat.id
+    user_id = get_user_id(message)
     name = message.text
-    logger.info(f'Message recieved:{name} by {user_id}')
     # In case of the user accidentally pressed the /start command
     # multiple times:
     if name == '/start':
@@ -114,10 +121,9 @@ def get_name(message: Message, bot: TeleBot):
 def get_city(message: Message, bot: TeleBot, user):
     """Gets user's city, updates users's db object
     and asks for confirmation."""
-    user_id = message.chat.id
+    user_id = get_user_id(message)
     city = message.text
-    logger.info(f'Message recieved:{city} by {user_id}')
-    if city == '/skip':
+    if city == '/skip' and user.role == STRANGER:
         return finish_registration(message, bot, user)
     send_text_message(bot, user_id, 'Запрос обрабатывается...')
     try:
@@ -148,9 +154,8 @@ def get_city(message: Message, bot: TeleBot, user):
 def confirm_city(message: Message, bot: TeleBot, geocoded_city, tz, user):
     """Update user's city and tz and sends him for admin approval
     if confirmed or asks for new one if denied."""
-    user_id = message.chat.id
+    user_id = get_user_id(message)
     command = message.text
-    logger.info(f'Message recieved:{command} by {user_id}')
     if command == '/deny':
         logger.info('City have been geocoded wrong')
         send_text_message(bot, user_id, 'Введите город с дополнительной '
@@ -160,7 +165,20 @@ def confirm_city(message: Message, bot: TeleBot, geocoded_city, tz, user):
         logger.info('City have been geocoded right')
         user.city = geocoded_city
         user.timezone = tz
-        finish_registration(message, bot, user)
+        if user.role == STRANGER:
+            finish_registration(message, bot, user)
+        else:
+            try:
+                update_obj(user)
+            except ToUserError as err:
+                send_text_message(bot, user.id, str(err))
+                bot.register_next_step_handler(message, confirm_city, bot,
+                                               user)
+            else:
+                send_text_message(bot, user.id, 'Город упешно изменён!')
+                logger.info(f'{user.id} successfully changed his city to'
+                            f'{geocoded_city}')
+
     else:
         answer_to_invalid_msg(message, bot)
         bot.register_next_step_handler(message, confirm_city, bot, user)
@@ -205,8 +223,7 @@ def finish_registration(message, bot, user):
 
 def approve(message: Message, bot: TeleBot):
     """Approves user registration."""
-    user_id = message.chat.id
-    logger.info(f'Message recieved:{message.text} by {user_id}')
+    user_id = get_user_id(message)
     if not is_staff_id(user_id):
         return answer_to_invalid_msg(message, bot)
     new_user_id = int(message.text.split('_')[1])  # type: ignore[union-attr]
@@ -238,12 +255,11 @@ def approve(message: Message, bot: TeleBot):
 
 def check_interests(message: Message, bot: TeleBot):
     """Shows the information about user interests."""
-    user_id = message.chat.id
-    command = message.text
-    logger.info(f'Message recieved:{command} by {user_id}')
+    user_id = get_user_id(message)
     try:
-        inspected_user, command_postscript = extract_user(user_id, command,
-                                                          message, bot)
+        inspected_user, command_postscript = extract_user(
+            user_id, message.text, message, bot
+        )
     except ValueError:
         return None
     interests_msg = (
@@ -264,12 +280,11 @@ def check_interests(message: Message, bot: TeleBot):
 
 def check_profile(message: Message, bot: TeleBot):
     """Shows the information about user."""
-    user_id = message.chat.id
-    command = message.text
-    logger.info(f'Message recieved:{command} by {user_id}')
+    user_id = get_user_id(message)
     try:
-        inspected_user, command_postscript = extract_user(user_id, command,
-                                                          message, bot)
+        inspected_user, command_postscript = extract_user(
+            user_id, message.text, message, bot
+        )
     except ValueError:
         return None
     profile_msg = (
@@ -310,8 +325,7 @@ def check_profile(message: Message, bot: TeleBot):
 
 def check_students(message: Message, bot: TeleBot):
     """Shows the list of all students."""
-    user_id = message.chat.id
-    logger.info(f'Message recieved:{message.text} by {user_id}')
+    user_id = get_user_id(message)
     if not is_staff_id(user_id):
         return answer_to_invalid_msg(message, bot)
     students = get_obj_list_where(User, User.role == STUDENT)
@@ -326,11 +340,10 @@ def check_students(message: Message, bot: TeleBot):
 
 def edit_profile(message: Message, bot: TeleBot):
     """Shows commands to edit the profile."""
-    user_id = message.chat.id
-    logger.info(f'Message recieved:{message.text} by {user_id}')
+    user_id = get_user_id(message)
     inspected_id = int(message.text.split('_')[1])  # type: ignore[union-attr]
-    if (not is_user_or_staff(inspected_id, user_id) or
-       not object_exists(User, inspected_id)):
+    if not (is_user_or_staff(inspected_id, user_id) and
+            object_exists(User, inspected_id)):
         return answer_to_invalid_msg(message, bot)
     command_root = f'/update_{inspected_id}_'
     edit_message = (
@@ -353,13 +366,79 @@ def edit_profile(message: Message, bot: TeleBot):
             f'Изменить роль: {command_root}role\n'
             f'Изменить часовой пояс: {command_root}timezone\n'
             f'Изменить время напоминания: {command_root}remindtime\n'
-            f'Изменить успеваемость: {command_root}rating'
+            f'Изменить успеваемость: {command_root}rating\n'
+            f'Изменить баллы: {command_root}points'
         )
     send_text_message(bot, user_id, edit_message)
+
+
+def handle_user_field_update(message: Message, bot: TeleBot):
+    """Handles update command for fields and registers handler for getting new
+    field value."""
+    user_id = get_user_id(message)
+    items = message.text.split('_')  # type: ignore[union-attr]
+    inspected_id = items[1]
+    field = items[2]
+    if not has_field_changing_permission(inspected_id, user_id, field):
+        return answer_to_invalid_msg(message, bot)
+    user = get_by_id(User, inspected_id)
+    if not user:
+        return send_text_message(
+            bot,
+            user_id,
+            'Что-то пошло не так! Кажется, такого пользователя не существует. '
+            'Если вы уверены, что всё делали правильно, пожалуйста, сообщите '
+            'администратору или попробуйте позже'
+        )
+    if field == 'city':
+        send_text_message(bot, user_id, 'Введите город, по часовому поясу '
+                                        'которого будут приходить уведомления')
+        bot.register_next_step_handler(message, get_city, bot, user)
+    else:
+        send_text_message(bot, user_id, 'Введите обновлённые данные. '
+                                        'Введите /cancel, если передумали')
+        bot.register_next_step_handler(message, update_user_field, bot, field,
+                                       user)
+
+
+def update_user_field(message: Message, bot: TeleBot, field, user):
+    """Gets field value and updates db object."""
+    user_id = get_user_id(message)
+    new_value = message.text
+    if new_value == '/cancel':
+        return send_text_message(bot, user_id, 'Отменено')
+    # Saving old name in case user updating it so report about update for admin
+    # is possible:
+    old_name = user.name
+
+    try:
+        setattr(user, field, new_value)
+        update_obj(user)
+    except ToUserError as err:
+        send_text_message(bot, user_id, str(err))
+        logger.error(f'Error while updating {field} of {user.id} by {user_id}')
+        bot.register_next_step_handler(message, update_user_field, bot, field,
+                                       user)
+    else:
+        send_text_message(bot, user_id, 'Поле успешно обновлено! /profile')
+        logger.info(f'User {user_id} succcessfully updated '
+                    f'{field} of {user.id}')
+        if not is_staff_id(user_id):
+            send_text_message(
+                bot,
+                ADMIN_ID,
+                f'Пользователь {old_name} обновил поле {field} следующей '
+                f'информацией:\n\n{new_value}'
+            )
 
 
 def answer_to_invalid_msg(message: Message, bot: TeleBot):
     """If user message does not fit any handlers, this will appear."""
     logger.info(f'Unknown command recieved: {message.text}')
-    send_text_message(bot, message.chat.id,
-                      'Я не понимаю что Вы хотите :(')
+    send_text_message(
+        bot,
+        message.chat.id,
+        'Я не понимаю, что Вы хотите :(\n'
+        'Возможно, какие-то из указанных данных не верны. А возможно, я просто'
+        ' пока не умею делать этого'
+    )
