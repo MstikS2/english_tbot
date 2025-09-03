@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from telebot import TeleBot
 from telebot.apihelper import ApiException
 from telebot.types import Message
@@ -323,7 +325,8 @@ def check_profile(message: Message, bot: TeleBot):
             f'\U0001F46E Роль: {inspected_user.role}\n'
             f'\U0001F30D Часовой пояс: {inspected_user.timezone}\n'
             '\U0001F55C Установленное пользователем время напоминаний '
-            f'о занятиях: {inspected_user.remindtime}\n'
+            'о занятиях: '
+            f'{str(inspected_user.remindtime).replace('days', 'д. ')}\n'
             f'\U0001F3C5 Успеваемость: {inspected_user.rating}\n'
             f'\U0001F3EB Назначенные занятия:\n'
         )
@@ -403,6 +406,23 @@ def handle_help(message: Message, bot: TeleBot):
     send_text_message(bot, user_id, help_msg, markup=profile_markup())
 
 
+def handle_remind(message: Message, bot: TeleBot, user=None):
+    """Handles /remind and asks for time input."""
+    if not user:
+        user_id = get_user_id(message)
+        user = get_by_id(User, user_id)
+    else:
+        user_id = user.id
+    current_remindtime = user.remindtime.seconds / 3600
+    msg = (
+        'Введите время одним числом в часах, например:\n\n1\nили\n2.5\n'
+        f'Текущее время напоминания: {current_remindtime}\nДля отмены - '
+        '/cancel'
+    )
+    send_text_message(bot, user_id, msg)
+    bot.register_next_step_handler(message, update_remindtime, bot, user)
+
+
 def handle_user_field_update(message: Message, bot: TeleBot):
     """Handles update command for fields and registers handler for getting new
     field value."""
@@ -426,11 +446,50 @@ def handle_user_field_update(message: Message, bot: TeleBot):
         send_text_message(bot, user_id, 'Введите город, по часовому поясу '
                                         'которого будут приходить уведомления')
         bot.register_next_step_handler(message, get_city, bot, user)
+    elif field == 'remindtime':
+        handle_remind(message, bot, user)
     else:
         send_text_message(bot, user_id, 'Введите обновлённые данные. '
                                         'Введите /cancel, если передумали')
         bot.register_next_step_handler(message, update_user_field, bot, field,
                                        user)
+
+
+def update_remindtime(message: Message, bot: TeleBot, user):
+    """Updates user remindtime field."""
+    user_id = get_user_id(message)
+    new_value = message.text
+    if new_value == '/cancel':
+        return send_text_message(bot, user_id, 'Отменено',
+                                 markup=profile_markup())
+    new_value = new_value.replace(',', '.')  # type: ignore[union-attr]
+    try:
+        user.remindtime = timedelta(hours=float(new_value))
+        update_obj(user)
+    except ValueError as err:
+        send_text_message(bot, user_id, 'Пожалуйста, введите корректное время '
+                                        'числом или отмените действие /cancel')
+        logger.error(f'Error while updating remindtime of {user.id} by '
+                     f'{user_id}: {err}')
+        bot.register_next_step_handler(message, update_remindtime, bot, user)
+    except ToUserError as err:
+        send_text_message(bot, user_id, str(err))
+        logger.error(f'Error while updating remindtime of {user.id} by '
+                     f'{user_id}: {err}')
+        bot.register_next_step_handler(message, update_remindtime, bot, user)
+    else:
+        send_text_message(bot, user_id, 'Время успешно обновлено!',
+                          markup=profile_markup())
+        logger.info(f'User {user_id} succcessfully updated '
+                    f'remindtime of {user.id}')
+        # if not is_staff_id(user_id):
+        #     send_text_message(
+        #         bot,
+        #         ADMIN_ID,
+        #         f'Пользователь {user.name} обновил время напоминания. Новое '
+        #         f'время:\n\n{new_value}',
+        #         markup=profile_markup()
+        #     )
 
 
 def update_user_field(message: Message, bot: TeleBot, field, user):

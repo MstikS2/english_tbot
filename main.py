@@ -2,8 +2,8 @@ from telebot import TeleBot
 
 from bot.handlers import (
     answer_to_invalid_msg, approve, check_interests, check_profile,
-    check_students, edit_profile, handle_help, handle_start_message,
-    handle_user_field_update
+    check_students, edit_profile, handle_help, handle_remind,
+    handle_start_message, handle_user_field_update
 )
 from bot.settings import DEBUG
 from core.loggers import get_logger
@@ -34,6 +34,8 @@ def register_handlers(bot: TeleBot):
                                  pass_bot=True)
     bot.register_message_handler(handle_help, pass_bot=True,
                                  regexp=r'^\/help$|^\U00002754Помощь$')
+    bot.register_message_handler(handle_remind, commands=['remind'],
+                                 pass_bot=True)
     bot.register_message_handler(handle_start_message, commands=['start'],
                                  pass_bot=True)
     bot.register_message_handler(handle_user_field_update, pass_bot=True,
