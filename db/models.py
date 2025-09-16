@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta
 
 from pytz import all_timezones
-from sqlalchemy import (Column, DateTime, ForeignKey, Interval, SmallInteger,
-                        String, Table, Text)
+from sqlalchemy import (Column, DateTime, ForeignKey, Interval, MetaData,
+                        SmallInteger, String, Table, Text)
 from sqlalchemy.orm import (DeclarativeBase, Mapped, mapped_column,
                             relationship, validates)
 from typing import Optional
@@ -17,6 +17,14 @@ from core.exceptions import ToUserError
 
 class Base(DeclarativeBase):
     """The base SQLAlchemy class."""
+
+    metadata = MetaData(naming_convention={
+        "ix": "ix_%(column_0_label)s",
+        "uq": "uq_%(table_name)s_%(column_0_name)s",
+        "ck": "ck_%(table_name)s_`%(constraint_name)s`",
+        "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+        "pk": "pk_%(table_name)s"
+    })
 
     type_annotation_map = {
         str: Text(),
@@ -40,6 +48,7 @@ class User(NamedModelMixin, Base):
     role: Mapped[Optional[str]] = mapped_column(default=STRANGER)
     username: Mapped[Optional[str]] = mapped_column(String(MAX_USERNAME_LEN))
     timezone: Mapped[str] = mapped_column(String(), server_default=DEFAULT_TZ)
+    price: Mapped[Optional[int]] = mapped_column(SmallInteger())
 
     # Student interests section:
     interests: Mapped[Optional[str]]
@@ -60,6 +69,8 @@ class User(NamedModelMixin, Base):
         Interval(),
         default=timedelta(hours=1)
     )
+    book_id: Mapped[Optional[int]] = mapped_column(ForeignKey('books.id'))
+    book: Mapped[Optional['Book']] = relationship(back_populates='students')
 
     @validates('role')
     def validate_role(self, key, value):
@@ -109,6 +120,39 @@ word_mtm_translation = Table(
 )
 
 
+word_mtm_unit = Table(
+    'word_mtm_unit',
+    Base.metadata,
+    Column('word_id', ForeignKey('words.id'), primary_key=True),
+    Column('unit_id', ForeignKey('units.id'), primary_key=True)
+)
+
+
+class Book(NamedModelMixin, Base):
+    """The db model for student's books."""
+
+    __tablename__ = 'books'
+
+    students: Mapped[Optional[list['User']]] = relationship(
+        back_populates='book'
+    )
+    units: Mapped[Optional[list['Unit']]] = relationship(back_populates='book')
+
+
+class Unit(NamedModelMixin, Base):
+    """The db model for student's book's units."""
+
+    __tablename__ = 'units'
+
+    book_id: Mapped[int] = mapped_column(ForeignKey('books.id'))
+    book: Mapped['Book'] = relationship(back_populates='units')
+    tasks: Mapped[Optional[list['Task']]] = relationship(back_populates='unit')
+    words: Mapped[Optional[list['Word']]] = relationship(
+        secondary=word_mtm_unit,
+        back_populates='units'
+    )
+
+
 class Translation(NamedModelMixin, Base):
     """The db models for Russian translations of English words."""
 
@@ -132,6 +176,10 @@ class Word(NamedModelMixin, Base):
         secondary=word_mtm_translation,
         back_populates='words'
     )
+    units: Mapped[Optional[list['Unit']]] = relationship(
+        secondary=word_mtm_unit,
+        back_populates='words'
+    )
 
 
 class Lesson(IdModelMixin, Base):
@@ -147,6 +195,7 @@ class Lesson(IdModelMixin, Base):
     lesson_datetime: Mapped[datetime]
     duration: Mapped[timedelta] = mapped_column(Interval(),
                                                 default=timedelta(hours=1))
+    price: Mapped[int] = mapped_column(SmallInteger())
 
 
 class Task(IdModelMixin, Base):
@@ -157,3 +206,5 @@ class Task(IdModelMixin, Base):
     task: Mapped[str]
     answer_id: Mapped[int] = mapped_column(ForeignKey('words.id'))
     answer: Mapped['Word'] = relationship(back_populates='tasks')
+    unit_id: Mapped[int] = mapped_column(ForeignKey('units.id'))
+    unit: Mapped['Unit'] = relationship(back_populates='tasks')

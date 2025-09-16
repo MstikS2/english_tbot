@@ -313,8 +313,10 @@ def check_profile(message: Message, bot: TeleBot):
         f'\U000023F3 Возраст: {field_or_unknown(inspected_user.age)}\n'
         f'\U0001F306 Город: {inspected_user.city}\n'
         '\U0001F4F1 Номер телефона: '
-        f'{field_or_unknown(inspected_user.phonenumber)}\n\n'
-        f'\U0001FA99 Баллы: {inspected_user.points}\n'
+        f'{field_or_unknown(inspected_user.phonenumber)}\n'
+        '\U0001F4D4 Учебник: '
+        f'{inspected_user.book.name if inspected_user.book else 'не выбран'}\n'
+        f'\n\U0001FA99 Баллы: {inspected_user.points}\n'
     )
     if is_staff_id(user_id):
         profile_msg += (
@@ -328,6 +330,8 @@ def check_profile(message: Message, bot: TeleBot):
             'о занятиях: '
             f'{str(inspected_user.remindtime).replace('days', 'д. ')}\n'
             f'\U0001F3C5 Успеваемость: {inspected_user.rating}\n'
+            '\U0001F4B0 Стоимость занятий: '
+            f'{field_or_unknown(inspected_user.price)}\n'
             f'\U0001F3EB Назначенные занятия:\n'
         )
         user_lessons = inspected_user.lessons
@@ -391,7 +395,9 @@ def edit_profile(message: Message, bot: TeleBot):
             f'Изменить часовой пояс: {command_root}timezone\n'
             f'Изменить время напоминания: {command_root}remindtime\n'
             f'Изменить успеваемость: {command_root}rating\n'
-            f'Изменить баллы: {command_root}points'
+            f'Изменить баллы: {command_root}points\n'
+            f'Изменить стоимость занятия: {command_root}price\n'
+            f'Изменить учебник: {command_root}book'
         )
     send_text_message(bot, user_id, edit_message, markup=profile_markup())
 

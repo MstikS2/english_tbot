@@ -1,15 +1,20 @@
 # DB values:
 DEFAULT_CITY = 'Москва, Центральный федеральный фкруг, Россия'
 DEFAULT_TZ = 'Europe/Moscow'
-INT_USER_FIELDS = ('id', 'age', 'rating', 'points')
+INT_USER_FIELDS = ('id', 'age', 'rating', 'points', 'price')
 MAX_CITY_LEN = 256
 MAX_NAME_LEN = 50
 MAX_PHONE_NUMBER_LEN = 19
 MAX_USERNAME_LEN = 32
+NAMING_CONV = {
+    'fk': 'fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s'
+}
 SAFE_USER_FIELDS = ('name', 'age', 'city', 'phonenumber', 'interests', 'books',
                     'films', 'games', 'music')
-EDITABLE_USER_FIELDS = SAFE_USER_FIELDS + ('username', 'role', 'timezone',
-                                           'remindtime', 'rating', 'points')
+EDITABLE_USER_FIELDS = SAFE_USER_FIELDS + (
+    'username', 'role', 'timezone', 'remindtime', 'rating', 'points', 'price',
+    'book'
+)
 
 # User roles:
 ADMIN, DEV, PENDING, STRANGER, STUDENT = ('admin', 'dev', 'pending',

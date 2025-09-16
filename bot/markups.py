@@ -9,3 +9,8 @@ def profile_markup():
     help_button = KeyboardButton('\U00002754Помощь')
     markup.add(profile_button, study_button, help_button)
     return markup
+
+
+def books_markup():
+    """Creates a markup with book names."""
+    pass
