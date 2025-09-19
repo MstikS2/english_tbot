@@ -12,15 +12,22 @@ from bot.permissions import (
 from core.exceptions import ToUserError
 from core.constants import ADMIN, DEV, PENDING, STRANGER, STUDENT
 from core.loggers import get_logger
-from db.crud import (create_obj, get_by_id, get_obj_list_where, object_exists,
-                     update_obj)
-from db.models import User
+from db.crud import (create_obj, delete_by_id, get_all, get_obj_where,
+                     get_obj_list_where, object_exists, update_obj)
+from db.models import Book, User
 from scripts.env_config import ADMIN_ID, NOMINATIM_USER_AGENT
 from scripts.timezones import get_timezone_by_city
-from scripts.views import field_or_unknown
+from scripts.views import field_or_unknown, list_names
 
 
 logger = get_logger(__name__)
+
+
+def cancel(text, user_id, bot: TeleBot):
+    """Handles /cancel command."""
+    if text == '/cancel':
+        send_text_message(bot, user_id, 'Отменено', markup=profile_markup())
+        return True
 
 
 def get_user_id(message: Message):
@@ -41,7 +48,7 @@ def extract_user(asker_id, command, message: Message, bot: TeleBot):
     else:
         inspected_id = asker_id
         command_postscript = ''
-    inspected_user = get_by_id(User, inspected_id)
+    inspected_user = get_obj_where(User, User.id == inspected_id)
     if not inspected_user:
         logger.error(f'User {asker_id} inspected non-existent user '
                      f'{inspected_user}')
@@ -60,8 +67,7 @@ def extract_user(asker_id, command, message: Message, bot: TeleBot):
 def send_text_message(bot: TeleBot, chat_id, message: str, markup=None):
     """Sends a text message to Telegram-chat."""
     try:
-        bot.send_message(chat_id=chat_id, text=message,
-                         reply_markup=markup)
+        bot.send_message(chat_id=chat_id, text=message, reply_markup=markup)
         logger.info(f'Успешно отправлено сообщение: "{message}"'
                     f'в чат {chat_id}')
     except ApiException as err:
@@ -81,7 +87,7 @@ def handle_start_message(message: Message, bot: TeleBot):
     if not has_debug_permission(user_id):
         return send_text_message(bot, user_id, 'You are not allowed to '
                                                'testing. Go away!')
-    user = get_by_id(User, user_id)
+    user = get_obj_where(User, User.id == user_id)
     if user and user.role != STRANGER:
         return send_text_message(
             bot,
@@ -107,7 +113,7 @@ def get_name(message: Message, bot: TeleBot):
     # multiple times:
     if name == '/start':
         return handle_start_message(message, bot)
-    user = get_by_id(User, user_id)
+    user = get_obj_where(User, User.id == user_id)
     user.name = name
     try:
         update_obj(user)
@@ -243,7 +249,7 @@ def approve(message: Message, bot: TeleBot):
     if not is_staff_id(user_id):
         return answer_to_invalid_msg(message, bot)
     new_user_id = int(message.text.split('_')[1])  # type: ignore[union-attr]
-    new_user = get_by_id(User, new_user_id)
+    new_user = get_obj_where(User, User.id == new_user_id)
     if new_user.role != PENDING:
         return send_text_message(bot, user_id, 'Этот пользователь уже одобрен',
                                  markup=profile_markup())
@@ -255,13 +261,28 @@ def approve(message: Message, bot: TeleBot):
     else:
         logger.info('New student have been approved: '
                     f'{new_user.name} {new_user_id}')
-        send_text_message(
-            bot,
-            user_id,
-            'Пользователь принят в падаваны!\n'
-            f'Его профиль: /profile_{new_user_id}',
-            markup=profile_markup()
-        )
+        books = get_all(Book)
+        if books:
+            book_list = list_names(books)
+            send_text_message(
+                bot,
+                user_id,
+                'Пользователь принят в падаваны!\nВыберите его учебник. '
+                'Для этого просто введите номер учебника из списка:\n' +
+                book_list +
+                '\nДобавить новый учебник можно командой /add_book',
+            )
+            bot.register_next_step_handler(message, update_book, bot, new_user,
+                                           books)
+        else:
+            send_text_message(
+                bot,
+                user_id,
+                'Пользователь принят в падаваны!\nНи одного учебника не '
+                'добавлено. Добавить новый учебник можно командой /add_book\n'
+                f'Профиль нового пользователя: /profile_{new_user_id}',
+                markup=profile_markup()
+            )
         send_text_message(
             bot,
             new_user_id,
@@ -270,6 +291,41 @@ def approve(message: Message, bot: TeleBot):
             markup=profile_markup()
         )
 # End of registration section
+
+
+def add_book(message: Message, bot: TeleBot):
+    """Asks for book input."""
+    user_id = get_user_id(message)
+    if not is_staff_id(user_id):
+        return answer_to_invalid_msg(message, bot)
+    send_text_message(
+            bot,
+            user_id,
+            'Введите полное название учебника, включая авторов и т.д., '
+            'если необходимо. Введённую информацию смогут увидеть ученики',
+        )
+    bot.register_next_step_handler(message, save_book, bot)
+
+
+def check_books(message: Message, bot: TeleBot):
+    """Shows the list of all books."""
+    user_id = get_user_id(message)
+    if not is_staff_id(user_id):
+        return answer_to_invalid_msg(message, bot)
+    books = get_all(Book)
+    if books:
+        book_list = list_names(books)
+        send_text_message(
+            bot,
+            user_id,
+            f'Добавленные учебники:\n{book_list}\n'
+            'Добавить новый учебник - /add_book\nУдалить существующий - '
+            '/delete_book',
+            markup=profile_markup()
+        )
+    else:
+        send_text_message(bot, user_id, 'Учебников пока нет',
+                          markup=profile_markup())
 
 
 def check_interests(message: Message, bot: TeleBot):
@@ -366,12 +422,70 @@ def check_students(message: Message, bot: TeleBot):
     send_text_message(bot, user_id, list_message, markup=profile_markup())
 
 
+def delete(message: Message, bot: TeleBot, objs):
+    """Gets object from user and deletes it from db."""
+    user_id = get_user_id(message)
+    obj_num = message.text
+    if cancel(obj_num, user_id, bot):
+        return
+    try:
+        obj = objs[int(obj_num) - 1]  # type: ignore[arg-type]
+    except ValueError:
+        send_text_message(
+                bot,
+                user_id,
+                'Команде не распознана. Пожалуйста, выберите объект '
+                'из списка выше или введите /cancel для отмены',
+            )
+        bot.register_next_step_handler(message, delete, bot, objs)
+    except IndexError:
+        send_text_message(
+                bot,
+                user_id,
+                'Кажется, такого номера нет в списке. Пожалуйста, выберите '
+                'объект из списка выше или введите /cancel для отмены',
+            )
+        bot.register_next_step_handler(message, delete, bot, objs)
+    else:
+        try:
+            delete_by_id(type(obj), obj.id)
+        except ToUserError as err:
+            send_text_message(bot, user_id, str(err))
+            logger.error(f'Error while deleting obj {obj}')
+            bot.register_next_step_handler(message, delete, bot, objs)
+        else:
+            send_text_message(bot, user_id, 'Удалено!',
+                              markup=profile_markup())
+            logger.info(f'User {user_id} succcessfully deleted {obj}')
+
+
+def delete_book(message: Message, bot: TeleBot):
+    """Shows the list of books and asks what book is user going to delete."""
+    user_id = get_user_id(message)
+    if not is_staff_id(user_id):
+        return answer_to_invalid_msg(message, bot)
+    books = get_all(Book)
+    if books:
+        book_list = list_names(books)
+        send_text_message(
+            bot,
+            user_id,
+            'Выберите учебник. '
+            'Для этого просто введите номер учебника из списка:\n'
+            f'{book_list}\nОтмена - /cancel',
+        )
+        bot.register_next_step_handler(message, delete, bot, books)
+    else:
+        send_text_message(bot, user_id, 'Учебников пока нет',
+                          markup=profile_markup())
+
+
 def edit_profile(message: Message, bot: TeleBot):
     """Shows commands to edit the profile."""
     user_id = get_user_id(message)
     inspected_id = int(message.text.split('_')[1])  # type: ignore[union-attr]
     if not (is_user_or_staff(inspected_id, user_id) and
-            object_exists(User, inspected_id)):
+            object_exists(User.id == inspected_id)):
         return answer_to_invalid_msg(message, bot)
     command_root = f'/update_{inspected_id}_'
     edit_message = (
@@ -408,7 +522,7 @@ def handle_help(message: Message, bot: TeleBot):
     help_msg = (f'/profile - профиль\n/edit_{user_id} - изменение профиля\n'
                 '/remind - установить время напоминания о занятиях')
     if is_staff_id(user_id):
-        help_msg += '\n/students - ученики'
+        help_msg += '\n\n/students - ученики\n/books - учебники'
     send_text_message(bot, user_id, help_msg, markup=profile_markup())
 
 
@@ -416,12 +530,12 @@ def handle_remind(message: Message, bot: TeleBot, user=None):
     """Handles /remind and asks for time input."""
     if not user:
         user_id = get_user_id(message)
-        user = get_by_id(User, user_id)
+        user = get_obj_where(User, User.id == user_id)
     else:
         user_id = user.id
     current_remindtime = user.remindtime.seconds / 3600
     msg = (
-        'Введите время одним числом в часах, например:\n\n1\nили\n2.5\n'
+        'Введите время одним числом в часах, например:\n\n1\nили\n2.5\n\n'
         f'Текущее время напоминания: {current_remindtime}\nДля отмены - '
         '/cancel'
     )
@@ -438,7 +552,7 @@ def handle_user_field_update(message: Message, bot: TeleBot):
     field = items[2]
     if not has_field_changing_permission(inspected_id, user_id, field):
         return answer_to_invalid_msg(message, bot)
-    user = get_by_id(User, inspected_id)
+    user = get_obj_where(User, User.id == inspected_id)
     if not user:
         return send_text_message(
             bot,
@@ -454,6 +568,29 @@ def handle_user_field_update(message: Message, bot: TeleBot):
         bot.register_next_step_handler(message, get_city, bot, user)
     elif field == 'remindtime':
         handle_remind(message, bot, user)
+    elif field == 'book':
+        books = get_all(Book)
+        if books:
+            book_list = list_names(books)
+            send_text_message(
+                bot,
+                user_id,
+                'Выберите учебник. '
+                'Для этого просто введите номер учебника из списка:\n' +
+                book_list +
+                '\nДобавить новый учебник можно командой /add_book. '
+                'Отмена - /cancel',
+            )
+            bot.register_next_step_handler(message, update_book, bot, user,
+                                           books)
+        else:
+            send_text_message(
+                bot,
+                user_id,
+                'Учебников пока нет. Добавить новый учебник можно командой '
+                '/add_book',
+                markup=profile_markup()
+            )
     else:
         send_text_message(bot, user_id, 'Введите обновлённые данные. '
                                         'Введите /cancel, если передумали')
@@ -461,13 +598,85 @@ def handle_user_field_update(message: Message, bot: TeleBot):
                                        user)
 
 
+def save_book(message: Message, bot: TeleBot):
+    """Creates new book objects for db."""
+    user_id = get_user_id(message)
+    book_name = message.text
+    if cancel(book_name, user_id, bot):
+        return
+    try:
+        assert not object_exists(Book.name == book_name)
+        create_obj(Book(name=book_name))
+    except ToUserError as err:
+        return send_text_message(bot, user_id, str(err))
+    except AssertionError:
+        send_text_message(
+            bot,
+            user_id,
+            'Учебник с таким названием уже добавлен! Введите название нового '
+            'учебника или /cancel для отмены'
+        )
+        bot.register_next_step_handler(message, save_book, bot)
+        logger.info(f'User tried to create existing book: {book_name}')
+    else:
+        send_text_message(
+            bot,
+            user_id,
+            f'Учебник "{book_name}" сохранён. Список учебников - /books',
+        )
+        logger.info(f'A new book has been created: {book_name}')
+
+
+def update_book(message: Message, bot: TeleBot, user, books):
+    """Updates user's book."""
+    user_id = get_user_id(message)
+    if not is_staff_id(user_id):
+        return answer_to_invalid_msg(message, bot)
+    book_num = message.text
+    if cancel(book_num, user_id, bot):
+        return
+    if book_num == '/add_book':
+        return add_book(message, bot)
+    try:
+        book = books[int(book_num) - 1]  # type: ignore[arg-type]
+    except ValueError:
+        send_text_message(
+                bot,
+                user_id,
+                'Команде не распознана. Пожалуйста, выберите учебник '
+                'из списка выше или введите /cancel для отмены',
+            )
+        bot.register_next_step_handler(message, update_book, bot, user, books)
+    except IndexError:
+        send_text_message(
+                bot,
+                user_id,
+                'Кажется, такого номера нет в списке. Пожалуйста, выберите '
+                'учебник из списка выше или введите /cancel для отмены',
+            )
+        bot.register_next_step_handler(message, update_book, bot, user, books)
+    else:
+        user.book = book
+        try:
+            update_obj(user)
+        except ToUserError as err:
+            send_text_message(bot, user_id, str(err))
+            logger.error(f'Error while updating book of {user.id}')
+            bot.register_next_step_handler(message, update_book, bot, user,
+                                           books)
+        else:
+            send_text_message(bot, user_id, 'Учебник успешно обновлён!',
+                              markup=profile_markup())
+            logger.info(f'User {user_id} succcessfully updated '
+                        f'book of {user.id}')
+
+
 def update_remindtime(message: Message, bot: TeleBot, user):
     """Updates user remindtime field."""
     user_id = get_user_id(message)
     new_value = message.text
-    if new_value == '/cancel':
-        return send_text_message(bot, user_id, 'Отменено',
-                                 markup=profile_markup())
+    if cancel(new_value, user_id, bot):
+        return
     new_value = new_value.replace(',', '.')  # type: ignore[union-attr]
     try:
         user.remindtime = timedelta(hours=float(new_value))
@@ -488,23 +697,22 @@ def update_remindtime(message: Message, bot: TeleBot, user):
                           markup=profile_markup())
         logger.info(f'User {user_id} succcessfully updated '
                     f'remindtime of {user.id}')
-        # if not is_staff_id(user_id):
-        #     send_text_message(
-        #         bot,
-        #         ADMIN_ID,
-        #         f'Пользователь {user.name} обновил время напоминания. Новое '
-        #         f'время:\n\n{new_value}',
-        #         markup=profile_markup()
-        #     )
+        if not is_staff_id(user_id):
+            send_text_message(
+                bot,
+                ADMIN_ID,
+                f'Пользователь {user.name} обновил время напоминания. Новое '
+                f'время:\n\n{new_value}',
+                markup=profile_markup()
+            )
 
 
 def update_user_field(message: Message, bot: TeleBot, field, user):
     """Gets field value and updates db object."""
     user_id = get_user_id(message)
     new_value = message.text
-    if new_value == '/cancel':
-        return send_text_message(bot, user_id, 'Отменено',
-                                 markup=profile_markup())
+    if cancel(new_value, user_id, bot):
+        return
     # Saving old name in case user updating it so report about update for admin
     # is possible:
     old_name = user.name

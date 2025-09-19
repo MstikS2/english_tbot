@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, sessionmaker
 from sqlalchemy.sql import exists
+from sqlalchemy.sql.expression import ColumnElement
 
 from core.exceptions import ToUserError
 from core.loggers import get_logger
@@ -29,30 +30,39 @@ def create_obj(obj, Session=Session):
             logger.info(f'Successfully created: {obj}')
 
 
-def get_by_id(obj_class, id, Session=Session):
-    """Returns obj of obj_class with given id or None if it does not exist."""
+def get_all(obj_class, Session=Session):
+    """Returns all objects of given class."""
     with Session() as session:
-        statement = select(obj_class).where(obj_class.id == id).options(
+        statement = select(obj_class)
+        objs = session.scalars(statement).all()
+    return objs
+
+
+def get_obj_where(obj_class, condition: ColumnElement[bool], Session=Session):
+    """Returns an object with given condition."""
+    with Session() as session:
+        statement = select(obj_class).where(condition).options(
             selectinload('*')
         )
         obj = session.scalars(statement).one_or_none()
     return obj
 
 
-def get_obj_list_where(obj_class, condition, Session=Session):
+def get_obj_list_where(obj_class, condition: ColumnElement[bool],
+                       Session=Session):
     """Returns a list of objects with given condition."""
     with Session() as session:
         statement = select(obj_class).where(condition).options(
             selectinload('*')
         )
-        students = session.scalars(statement).all()
-    return students
+        objs = session.scalars(statement).all()
+    return objs
 
 
-def object_exists(obj_class, id):
-    """Checks if object with given id exists in db."""
+def object_exists(statement):
+    """Checks if object with given statement exists in db."""
     with Session() as session:
-        return session.query(exists().where(obj_class.id == id)).scalar()
+        return session.query(exists().where(statement)).scalar()
 
 
 def update_obj(obj, Session=Session):
@@ -76,7 +86,7 @@ def delete_by_id(obj_class, id, Session=Session):
     """Deletes db obj by given id."""
     with Session() as session:
         try:
-            obj = get_by_id(obj_class, id)
+            obj = get_obj_where(obj_class, obj_class.id == id)
             session.delete(obj)
         except Exception as err:
             logger.error(f'Something went wrong while deleting {obj}. {err}')

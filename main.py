@@ -1,9 +1,9 @@
 from telebot import TeleBot
 
 from bot.handlers import (
-    answer_to_invalid_msg, approve, check_interests, check_profile,
-    check_students, edit_profile, handle_help, handle_remind,
-    handle_start_message, handle_user_field_update
+    add_book, answer_to_invalid_msg, approve, check_books, check_interests,
+    check_profile, check_students, delete_book, edit_profile, handle_help,
+    handle_remind, handle_start_message, handle_user_field_update
 )
 from bot.settings import DEBUG
 from core.loggers import get_logger
@@ -19,7 +19,11 @@ bot = TeleBot(token=DEBUG_TOKEN if DEBUG
 
 def register_handlers(bot: TeleBot):
     """Registers all bot handlers."""
+    bot.register_message_handler(add_book, commands=['add_book'],
+                                 pass_bot=True)
     bot.register_message_handler(approve, regexp=r'^\/approve_\d+$',
+                                 pass_bot=True)
+    bot.register_message_handler(check_books, commands=['books'],
                                  pass_bot=True)
     bot.register_message_handler(check_interests,
                                  regexp=r'^\/interests(_\d+)?$', pass_bot=True)
@@ -29,6 +33,8 @@ def register_handlers(bot: TeleBot):
         pass_bot=True
     )
     bot.register_message_handler(check_students, commands=['students'],
+                                 pass_bot=True)
+    bot.register_message_handler(delete_book, commands=['delete_book'],
                                  pass_bot=True)
     bot.register_message_handler(edit_profile, regexp=r'^\/edit_\d+$',
                                  pass_bot=True)
