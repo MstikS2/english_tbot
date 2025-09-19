@@ -27,3 +27,23 @@ LOG_DIR = 'logs'
 LOG_FORMATTER_MSG = ('%(asctime)s| %(levelname)s| %(name)s - %(funcName)s: '
                      '%(message)s')
 LOG_MAXBYTES = 50000000
+
+# Commands:
+ADD = 'add'
+ADD_BOOK = ADD + '_book'
+APPROVE = 'approve'
+BOOKS = 'books'
+CANCEL = 'cancel'
+CONFIRM = 'confirm'
+DELETE = 'delete'
+DELETE_BOOK = DELETE + '_book'
+DENY = 'deny'
+EDIT = 'edit'
+HELP = 'help'
+INTERESTS = 'interests'
+PROFILE = 'profile'
+REMIND = 'remind'
+SKIP = 'skip'
+START = 'start'
+STUDENTS = 'students'
+UPDATE = 'update'

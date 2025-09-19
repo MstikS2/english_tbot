@@ -10,7 +10,11 @@ from bot.permissions import (
     is_user_or_staff
 )
 from core.exceptions import ToUserError
-from core.constants import ADMIN, DEV, PENDING, STRANGER, STUDENT
+from core.constants import (
+    ADMIN, ADD_BOOK, APPROVE, BOOKS, CANCEL, CONFIRM, DELETE_BOOK, DENY, DEV,
+    EDIT, INTERESTS, PENDING, PROFILE, REMIND, SKIP, START, STRANGER, STUDENT,
+    STUDENTS, UPDATE
+)
 from core.loggers import get_logger
 from db.crud import (create_obj, delete_by_id, get_all, get_obj_where,
                      get_obj_list_where, object_exists, update_obj)
@@ -24,8 +28,8 @@ logger = get_logger(__name__)
 
 
 def cancel(text, user_id, bot: TeleBot):
-    """Handles /cancel command."""
-    if text == '/cancel':
+    """Handles cancel command."""
+    if text == f'/{CANCEL}':
         send_text_message(bot, user_id, 'Отменено', markup=profile_markup())
         return True
 
@@ -111,7 +115,7 @@ def get_name(message: Message, bot: TeleBot):
     name = message.text
     # In case of the user accidentally pressed the /start command
     # multiple times:
-    if name == '/start':
+    if name == f'/{START}':
         return handle_start_message(message, bot)
     user = get_obj_where(User, User.id == user_id)
     user.name = name
@@ -127,9 +131,9 @@ def get_name(message: Message, bot: TeleBot):
             f'Приятно познакомиться, {name}!\n'
             '\n'
             'Чтобы информация о предстоящих занятиях была показана в Вашем '
-            'часовом поясе, введите Ваш город. Либо /skip - тогда информация '
-            'о занятиях будет отображаться в московском времени (GMT+3). '
-            'Город можно будет изменить в любой момент'
+            f'часовом поясе, введите Ваш город. Либо /{SKIP} - тогда '
+            'информация о занятиях будет отображаться в московском времени '
+            '(GMT+3). Город можно будет изменить в любой момент'
         )
         bot.register_next_step_handler(message, get_city, bot, user)
 
@@ -139,7 +143,7 @@ def get_city(message: Message, bot: TeleBot, user):
     and asks for confirmation."""
     user_id = get_user_id(message)
     city = message.text
-    if city == '/skip' and user.role == STRANGER:
+    if city == f'/{SKIP}' and user.role == STRANGER:
         return finish_registration(message, bot, user)
     send_text_message(bot, user_id, 'Запрос обрабатывается...')
     try:
@@ -157,8 +161,8 @@ def get_city(message: Message, bot: TeleBot, user):
             '\n'
             f'{geocoded_city}\n'
             '\n'
-            'Если всё правильно, введите /confirm. Если присутствует ошибка, '
-            'введите /deny, а затем попробуйте ввести более точную '
+            f'Если всё правильно, введите /{CONFIRM}. Если присутствует '
+            f'ошибка, введите /{DENY}, а затем попробуйте ввести более точную '
             'информацию, например, так:\n'
             '\n'
             'Город, Регион, Страна'
@@ -172,12 +176,12 @@ def confirm_city(message: Message, bot: TeleBot, geocoded_city, tz, user):
     if confirmed or asks for new one if denied."""
     user_id = get_user_id(message)
     command = message.text
-    if command == '/deny':
+    if command == f'/{DENY}':
         logger.info('City have been geocoded wrong')
         send_text_message(bot, user_id, 'Введите город с дополнительной '
                           'информацией о нём')
         bot.register_next_step_handler(message, get_city, bot, user)
-    elif command == '/confirm':
+    elif command == f'/{CONFIRM}':
         logger.info('City have been geocoded right')
         user.city = geocoded_city
         user.timezone = tz
@@ -219,7 +223,7 @@ def finish_registration(message, bot, user):
             bot,
             user.id,
             'Готово! Ожидайте проверки администратором. А пока, '
-            'если хотите, можете настроить свой профиль: /profile'
+            f'если хотите, можете настроить свой профиль: /{PROFILE}'
         )
         if not is_staff_id(user.id):
             username = user.username
@@ -230,7 +234,7 @@ def finish_registration(message, bot, user):
             send_text_message(
                 bot,
                 ADMIN_ID,
-                confirmation_msg + f'. Принять ученика: /approve_{user.id}',
+                confirmation_msg + f'. Принять ученика: /{APPROVE}_{user.id}',
                 markup=profile_markup()
             )
         else:
@@ -270,7 +274,7 @@ def approve(message: Message, bot: TeleBot):
                 'Пользователь принят в падаваны!\nВыберите его учебник. '
                 'Для этого просто введите номер учебника из списка:\n' +
                 book_list +
-                '\nДобавить новый учебник можно командой /add_book',
+                f'\nДобавить новый учебник можно командой /{ADD_BOOK}',
             )
             bot.register_next_step_handler(message, update_book, bot, new_user,
                                            books)
@@ -279,8 +283,8 @@ def approve(message: Message, bot: TeleBot):
                 bot,
                 user_id,
                 'Пользователь принят в падаваны!\nНи одного учебника не '
-                'добавлено. Добавить новый учебник можно командой /add_book\n'
-                f'Профиль нового пользователя: /profile_{new_user_id}',
+                f'добавлено. Добавить новый учебник можно командой /{ADD_BOOK}'
+                f'\nПрофиль нового пользователя: /{PROFILE}_{new_user_id}',
                 markup=profile_markup()
             )
         send_text_message(
@@ -319,8 +323,8 @@ def check_books(message: Message, bot: TeleBot):
             bot,
             user_id,
             f'Добавленные учебники:\n{book_list}\n'
-            'Добавить новый учебник - /add_book\nУдалить существующий - '
-            '/delete_book',
+            f'Добавить новый учебник - /{ADD_BOOK}\nУдалить существующий - '
+            f'/{DELETE_BOOK}',
             markup=profile_markup()
         )
     else:
@@ -348,7 +352,7 @@ def check_interests(message: Message, bot: TeleBot):
         f'{field_or_unknown(inspected_user.games)}\n\n'
         '\U0001F3B6 Любимая музыка: '
         f'{field_or_unknown(inspected_user.music)}\n\n'
-        f'Редактировать: /edit_{inspected_user.id}'
+        f'Редактировать: /{EDIT}_{inspected_user.id}'
     )
     send_text_message(bot, user_id, interests_msg, markup=profile_markup())
 
@@ -397,8 +401,8 @@ def check_profile(message: Message, bot: TeleBot):
         else:
             profile_msg += 'Не назначено ни одного занятия\n'
     profile_msg += (
-        f'\nИнтересы: /interests{command_postscript}\n'
-        f'Редактировать профиль: /edit_{inspected_user.id}'
+        f'\nИнтересы: /{INTERESTS}{command_postscript}\n'
+        f'Редактировать профиль: /{EDIT}_{inspected_user.id}'
     )
     send_text_message(bot, user_id, profile_msg, markup=profile_markup())
 
@@ -418,7 +422,8 @@ def check_students(message: Message, bot: TeleBot):
         )
     list_message = 'Вот список учеников:\n\n'
     for number, student in enumerate(students):
-        list_message += f'{number + 1}) {student.name} /profile_{student.id}\n'
+        list_message += (f'{number + 1}) {student.name} /{PROFILE}_'
+                         f'{student.id}\n')
     send_text_message(bot, user_id, list_message, markup=profile_markup())
 
 
@@ -435,7 +440,7 @@ def delete(message: Message, bot: TeleBot, objs):
                 bot,
                 user_id,
                 'Команде не распознана. Пожалуйста, выберите объект '
-                'из списка выше или введите /cancel для отмены',
+                f'из списка выше или введите /{CANCEL} для отмены',
             )
         bot.register_next_step_handler(message, delete, bot, objs)
     except IndexError:
@@ -443,7 +448,7 @@ def delete(message: Message, bot: TeleBot, objs):
                 bot,
                 user_id,
                 'Кажется, такого номера нет в списке. Пожалуйста, выберите '
-                'объект из списка выше или введите /cancel для отмены',
+                f'объект из списка выше или введите /{CANCEL} для отмены',
             )
         bot.register_next_step_handler(message, delete, bot, objs)
     else:
@@ -472,7 +477,7 @@ def delete_book(message: Message, bot: TeleBot):
             user_id,
             'Выберите учебник. '
             'Для этого просто введите номер учебника из списка:\n'
-            f'{book_list}\nОтмена - /cancel',
+            f'{book_list}\nОтмена - /{CANCEL}',
         )
         bot.register_next_step_handler(message, delete, bot, books)
     else:
@@ -487,7 +492,7 @@ def edit_profile(message: Message, bot: TeleBot):
     if not (is_user_or_staff(inspected_id, user_id) and
             object_exists(User.id == inspected_id)):
         return answer_to_invalid_msg(message, bot)
-    command_root = f'/update_{inspected_id}_'
+    command_root = f'/{UPDATE}_{inspected_id}_'
     edit_message = (
         f'Изменить имя: {command_root}name\n'
         f'Изменить возраст: {command_root}age\n'
@@ -519,10 +524,10 @@ def edit_profile(message: Message, bot: TeleBot):
 def handle_help(message: Message, bot: TeleBot):
     """Sends the user a list of basic commands."""
     user_id = get_user_id(message)
-    help_msg = (f'/profile - профиль\n/edit_{user_id} - изменение профиля\n'
-                '/remind - установить время напоминания о занятиях')
+    help_msg = (f'/{PROFILE} - профиль\n/{EDIT}_{user_id} - изменение профиля'
+                f'\n/{REMIND} - установить время напоминания о занятиях')
     if is_staff_id(user_id):
-        help_msg += '\n\n/students - ученики\n/books - учебники'
+        help_msg += f'\n\n/{STUDENTS} - ученики\n/{BOOKS} - учебники'
     send_text_message(bot, user_id, help_msg, markup=profile_markup())
 
 
@@ -537,7 +542,7 @@ def handle_remind(message: Message, bot: TeleBot, user=None):
     msg = (
         'Введите время одним числом в часах, например:\n\n1\nили\n2.5\n\n'
         f'Текущее время напоминания: {current_remindtime}\nДля отмены - '
-        '/cancel'
+        f'/{CANCEL}'
     )
     send_text_message(bot, user_id, msg)
     bot.register_next_step_handler(message, update_remindtime, bot, user)
@@ -578,8 +583,8 @@ def handle_user_field_update(message: Message, bot: TeleBot):
                 'Выберите учебник. '
                 'Для этого просто введите номер учебника из списка:\n' +
                 book_list +
-                '\nДобавить новый учебник можно командой /add_book. '
-                'Отмена - /cancel',
+                f'\nДобавить новый учебник можно командой /{ADD_BOOK}. '
+                f'Отмена - /{CANCEL}',
             )
             bot.register_next_step_handler(message, update_book, bot, user,
                                            books)
@@ -588,12 +593,12 @@ def handle_user_field_update(message: Message, bot: TeleBot):
                 bot,
                 user_id,
                 'Учебников пока нет. Добавить новый учебник можно командой '
-                '/add_book',
+                f'/{ADD_BOOK}',
                 markup=profile_markup()
             )
     else:
         send_text_message(bot, user_id, 'Введите обновлённые данные. '
-                                        'Введите /cancel, если передумали')
+                                        f'Введите /{CANCEL}, если передумали')
         bot.register_next_step_handler(message, update_user_field, bot, field,
                                        user)
 
@@ -614,7 +619,7 @@ def save_book(message: Message, bot: TeleBot):
             bot,
             user_id,
             'Учебник с таким названием уже добавлен! Введите название нового '
-            'учебника или /cancel для отмены'
+            f'учебника или /{CANCEL} для отмены'
         )
         bot.register_next_step_handler(message, save_book, bot)
         logger.info(f'User tried to create existing book: {book_name}')
@@ -622,7 +627,7 @@ def save_book(message: Message, bot: TeleBot):
         send_text_message(
             bot,
             user_id,
-            f'Учебник "{book_name}" сохранён. Список учебников - /books',
+            f'Учебник "{book_name}" сохранён. Список учебников - /{BOOKS}',
         )
         logger.info(f'A new book has been created: {book_name}')
 
@@ -635,7 +640,7 @@ def update_book(message: Message, bot: TeleBot, user, books):
     book_num = message.text
     if cancel(book_num, user_id, bot):
         return
-    if book_num == '/add_book':
+    if book_num == f'/{ADD_BOOK}':
         return add_book(message, bot)
     try:
         book = books[int(book_num) - 1]  # type: ignore[arg-type]
@@ -644,7 +649,7 @@ def update_book(message: Message, bot: TeleBot, user, books):
                 bot,
                 user_id,
                 'Команде не распознана. Пожалуйста, выберите учебник '
-                'из списка выше или введите /cancel для отмены',
+                f'из списка выше или введите /{CANCEL} для отмены',
             )
         bot.register_next_step_handler(message, update_book, bot, user, books)
     except IndexError:
@@ -652,7 +657,7 @@ def update_book(message: Message, bot: TeleBot, user, books):
                 bot,
                 user_id,
                 'Кажется, такого номера нет в списке. Пожалуйста, выберите '
-                'учебник из списка выше или введите /cancel для отмены',
+                f'учебник из списка выше или введите /{CANCEL} для отмены',
             )
         bot.register_next_step_handler(message, update_book, bot, user, books)
     else:
@@ -682,8 +687,12 @@ def update_remindtime(message: Message, bot: TeleBot, user):
         user.remindtime = timedelta(hours=float(new_value))
         update_obj(user)
     except ValueError as err:
-        send_text_message(bot, user_id, 'Пожалуйста, введите корректное время '
-                                        'числом или отмените действие /cancel')
+        send_text_message(
+            bot,
+            user_id,
+            'Пожалуйста, введите корректное время '
+            f'числом или отмените действие /{CANCEL}'
+        )
         logger.error(f'Error while updating remindtime of {user.id} by '
                      f'{user_id}: {err}')
         bot.register_next_step_handler(message, update_remindtime, bot, user)
