@@ -328,8 +328,12 @@ def check_books(message: Message, bot: TeleBot):
             markup=profile_markup()
         )
     else:
-        send_text_message(bot, user_id, 'Учебников пока нет',
-                          markup=profile_markup())
+        send_text_message(
+            bot,
+            user_id,
+            f'Учебников пока нет. Добавить новый учебник - /{ADD_BOOK}',
+            markup=profile_markup()
+        )
 
 
 def check_interests(message: Message, bot: TeleBot):

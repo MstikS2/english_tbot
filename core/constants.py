@@ -28,17 +28,20 @@ LOG_FORMATTER_MSG = ('%(asctime)s| %(levelname)s| %(name)s - %(funcName)s: '
                      '%(message)s')
 LOG_MAXBYTES = 50000000
 
-# Commands:
+# Bot commands:
 ADD = 'add'
 ADD_BOOK = ADD + '_book'
+ADD_WORD = ADD + '_word'
 APPROVE = 'approve'
 BOOKS = 'books'
 CANCEL = 'cancel'
 CONFIRM = 'confirm'
 DELETE = 'delete'
 DELETE_BOOK = DELETE + '_book'
+DELETE_WORD = DELETE + '_word'
 DENY = 'deny'
 EDIT = 'edit'
+EDIT_WORD = EDIT + '_word'
 HELP = 'help'
 INTERESTS = 'interests'
 PROFILE = 'profile'
@@ -47,3 +50,4 @@ SKIP = 'skip'
 START = 'start'
 STUDENTS = 'students'
 UPDATE = 'update'
+WORDS = 'words'

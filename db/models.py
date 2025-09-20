@@ -31,6 +31,12 @@ class Base(DeclarativeBase):
         datetime: DateTime()
     }
 
+    @property
+    def child_names(self):
+        """Returns names of child fields of model.
+        Should be redefined in models."""
+        pass
+
 
 class User(NamedModelMixin, Base):
     """The User db model."""
@@ -72,6 +78,10 @@ class User(NamedModelMixin, Base):
     book_id: Mapped[Optional[int]] = mapped_column(ForeignKey('books.id'))
     book: Mapped[Optional['Book']] = relationship(back_populates='students')
 
+    @property
+    def child_names(self):
+        return ('lessons',)
+
     @validates('role')
     def validate_role(self, key, value):
         """Checks if role is valid."""
@@ -111,6 +121,10 @@ class Category(NamedModelMixin, Base):
     )
     words: Mapped[list['Word']] = relationship(back_populates='category')
 
+    @property
+    def child_names(self):
+        return ('translations', 'words')
+
 
 word_mtm_translation = Table(
     'word_mtm_translation',
@@ -138,19 +152,28 @@ class Book(NamedModelMixin, Base):
     )
     units: Mapped[Optional[list['Unit']]] = relationship(back_populates='book')
 
+    @property
+    def child_names(self):
+        return ('students', 'units')
+
 
 class Unit(NamedModelMixin, Base):
     """The db model for student's book's units."""
 
     __tablename__ = 'units'
 
-    book_id: Mapped[int] = mapped_column(ForeignKey('books.id'))
+    book_id: Mapped[int] = mapped_column(ForeignKey('books.id',
+                                                    ondelete='CASCADE'))
     book: Mapped['Book'] = relationship(back_populates='units')
     tasks: Mapped[Optional[list['Task']]] = relationship(back_populates='unit')
     words: Mapped[Optional[list['Word']]] = relationship(
         secondary=word_mtm_unit,
         back_populates='units'
     )
+
+    @property
+    def child_names(self):
+        return ('tasks',)
 
 
 class Translation(NamedModelMixin, Base):
@@ -187,7 +210,8 @@ class Lesson(IdModelMixin, Base):
 
     __tablename__ = 'lessons'
 
-    student_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
+    student_id: Mapped[int] = mapped_column(ForeignKey('users.id',
+                                                       ondelete='CASCADE'))
     student: Mapped['User'] = relationship(back_populates='lessons')
     # This field will always contain UTC datetime.
     # User will get both GMT datetime and converted to his timezone datetime
@@ -204,7 +228,9 @@ class Task(IdModelMixin, Base):
     __tablename__ = 'tasks'
 
     task: Mapped[str]
-    answer_id: Mapped[int] = mapped_column(ForeignKey('words.id'))
+    answer_id: Mapped[int] = mapped_column(ForeignKey('words.id',
+                                                      ondelete='CASCADE'))
     answer: Mapped['Word'] = relationship(back_populates='tasks')
-    unit_id: Mapped[int] = mapped_column(ForeignKey('units.id'))
+    unit_id: Mapped[int] = mapped_column(ForeignKey('units.id',
+                                                    ondelete='CASCADE'))
     unit: Mapped['Unit'] = relationship(back_populates='tasks')
