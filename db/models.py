@@ -67,7 +67,7 @@ class User(NamedModelMixin, Base):
     rating: Mapped[int] = mapped_column(SmallInteger(), default=0)
     grade: Mapped[Optional[str]] = mapped_column(String())
     lessons: Mapped[Optional[list['Lesson']]] = relationship(
-        back_populates='student'
+        back_populates='student', cascade='all, delete-orphan'
     )
     points: Mapped[int] = mapped_column(SmallInteger(), default=0)
     # No reminder if null:
@@ -150,7 +150,9 @@ class Book(NamedModelMixin, Base):
     students: Mapped[Optional[list['User']]] = relationship(
         back_populates='book'
     )
-    units: Mapped[Optional[list['Unit']]] = relationship(back_populates='book')
+    units: Mapped[Optional[list['Unit']]] = relationship(
+        back_populates='book', cascade='all, delete-orphan'
+    )
 
     @property
     def child_names(self):
@@ -165,7 +167,9 @@ class Unit(NamedModelMixin, Base):
     book_id: Mapped[int] = mapped_column(ForeignKey('books.id',
                                                     ondelete='CASCADE'))
     book: Mapped['Book'] = relationship(back_populates='units')
-    tasks: Mapped[Optional[list['Task']]] = relationship(back_populates='unit')
+    tasks: Mapped[Optional[list['Task']]] = relationship(
+        back_populates='unit', cascade='all, delete-orphan'
+    )
     words: Mapped[Optional[list['Word']]] = relationship(
         secondary=word_mtm_unit,
         back_populates='units'
@@ -194,7 +198,8 @@ class Word(NamedModelMixin, Base):
 
     category_id: Mapped[int] = mapped_column(ForeignKey('categories.id'))
     category: Mapped['Category'] = relationship(back_populates='words')
-    tasks: Mapped[list['Task']] = relationship(back_populates='answer')
+    tasks: Mapped[list['Task']] = relationship(back_populates='answer',
+                                               cascade='all, delete-orphan')
     translations: Mapped[list['Translation']] = relationship(
         secondary=word_mtm_translation,
         back_populates='words'

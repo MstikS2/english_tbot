@@ -25,6 +25,17 @@ def exec_with_session(session, func):
     return result
 
 
+def create_all(obj_list, Session=Session):
+    """Creates db objs for list of python objs."""
+    def orm_func(session, obj_list=obj_list):
+        logger.info(f'Trying to create a list of objs: {obj_list}')
+        for obj in obj_list:
+            create_obj(obj, session)
+        logger.info('Successfully created a list')
+
+    exec_with_session(Session(), orm_func)
+
+
 def create_obj(obj, Session=Session):
     """Creates db obj with given python obj."""
     def orm_func(session, obj=obj):
@@ -131,4 +142,4 @@ def delete_by_id(obj_class, id, Session=Session):
             session.commit()
             logger.info(f'Successfully deleted: {obj}')
 
-    exec_with_session(Session, orm_func)
+    exec_with_session(Session(), orm_func)

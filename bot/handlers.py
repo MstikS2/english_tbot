@@ -16,9 +16,11 @@ from core.constants import (
     STUDENTS, UPDATE
 )
 from core.loggers import get_logger
-from db.crud import (create_obj, delete_by_id, get_all, get_obj_where,
-                     get_obj_list_where, object_exists, update_obj)
-from db.models import Book, User
+from db.crud import (
+    create_all, create_obj, delete_by_id, get_all, get_obj_where,
+    get_obj_list_where, object_exists, update_obj
+)
+from db.models import Book, Unit, User
 from scripts.env_config import ADMIN_ID, NOMINATIM_USER_AGENT
 from scripts.timezones import get_timezone_by_city
 from scripts.views import field_or_unknown, list_names
@@ -306,9 +308,28 @@ def add_book(message: Message, bot: TeleBot):
             bot,
             user_id,
             'Введите полное название учебника, включая авторов и т.д., '
-            'если необходимо. Введённую информацию смогут увидеть ученики',
+            'если необходимо. Введённую информацию смогут увидеть ученики\n\n'
+            f'Отмена - /{CANCEL}',
         )
-    bot.register_next_step_handler(message, save_book, bot)
+    bot.register_next_step_handler(message, add_units, bot)
+
+
+def add_units(message: Message, bot: TeleBot):
+    """Asks for units input."""
+    user_id = get_user_id(message)
+    book_name = message.text
+    if cancel(book_name, user_id, bot):
+        return
+    send_text_message(
+            bot,
+            user_id,
+            'Отлично! Теперь укажите список юнитов, входящих в учебник, '
+            'в слудующем формате:\n\n'
+            'Unit1\nUnit2\nUnit3\n\nНазвания юнитов можно указывать'
+            'в свободной форме. Эти названия будут видеть ученики\n'
+            f'Отмена - /{CANCEL}',
+        )
+    bot.register_next_step_handler(message, save_book, bot, book_name)
 
 
 def check_books(message: Message, bot: TeleBot):
@@ -607,15 +628,18 @@ def handle_user_field_update(message: Message, bot: TeleBot):
                                        user)
 
 
-def save_book(message: Message, bot: TeleBot):
-    """Creates new book objects for db."""
+def save_book(message: Message, bot: TeleBot, book_name):
+    """Creates new book and units objects for db."""
     user_id = get_user_id(message)
-    book_name = message.text
-    if cancel(book_name, user_id, bot):
+    unit_names = message.text
+    if cancel(unit_names, user_id, bot):
         return
+    book = Book(name=book_name)
+    unit_list = unit_names.split('\n')  # type: ignore[union-attr]
+    unit_objs = [Unit(name=unit, book=book) for unit in unit_list]
     try:
         assert not object_exists(Book.name == book_name)
-        create_obj(Book(name=book_name))
+        create_all((book, *unit_objs))
     except ToUserError as err:
         return send_text_message(bot, user_id, str(err))
     except AssertionError:
@@ -633,7 +657,8 @@ def save_book(message: Message, bot: TeleBot):
             user_id,
             f'Учебник "{book_name}" сохранён. Список учебников - /{BOOKS}',
         )
-        logger.info(f'A new book has been created: {book_name}')
+        logger.info(f'A new book has been created: {book_name} '
+                    f'with {unit_names}')
 
 
 def update_book(message: Message, bot: TeleBot, user, books):
